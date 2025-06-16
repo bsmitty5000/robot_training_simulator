@@ -1,7 +1,11 @@
 import sys
 import numpy as np
+#import os
+#os.environ["SDL_VIDEODRIVER"] = "dummy"
 import pygame
 import random
+from courses.course1 import GridCoverageCourseA
+from courses.grid_coverage_course import GridCoverageCourse
 from ml_stuff.ff_net_decision_maker import FFNetDecisionMaker
 from models.distance_sensors.sharp_ir import SharpIR
 from models.robots.robot import RobotBase
@@ -9,6 +13,11 @@ from models.robots.two_wheel_TT import TwoWheelTT
 from models.obstacle import Obstacle
 from smart_car.smart_car import SmartCar
 from ml_stuff.decision_base import DecisionBase
+
+WIDTH = 1280
+HEIGHT = 720
+FRAME_RATE = 60
+COVERAGE_ABORT_S = 5
 
 class DummyDecision(DecisionBase):
     @property
@@ -33,9 +42,65 @@ def circle_rect_collision(robot_sprite : RobotBase, obstacle_sprite : Obstacle) 
     # Check if the distance is less than the radius
     return center.distance_to(closest) < radius
 
-def run_simulation(screen, clock):
+def show_coverage_screen(screen, clock, course: GridCoverageCourse):
+    font = pygame.font.SysFont("consolas", 36)
+    coverage = course.coverage_ratio() * 100
+    text = f"Course Coverage: {coverage:.2f}%"
+    text_surface = font.render(text, True, (255, 255, 255))
+    screen.fill("black")
+    screen.blit(text_surface, (screen.get_width() // 2 - text_surface.get_width() // 2,
+                               screen.get_height() // 2 - text_surface.get_height() // 2))
+    pygame.display.flip()
+
+    waiting = True
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                waiting = False
+        clock.tick(30)
+
+def show_debug_info(screen, smart_car: SmartCar):
+    font = pygame.font.SysFont("consolas", 12)
+    sensor_text = "Sensors: " + ", ".join(
+        f"{s.last_distance_m:5.2f}" if s.last_distance_m is not None else "N/A"
+        for s in smart_car.sprite.robot.distance_sensors
+    )
+
+    # Get neural net outputs and scaled control inputs
+    # (Repeat the logic from SmartCar.update for display)
+    sensor_distances = [
+        s.last_distance_m if s.last_distance_m is not None else 0.0
+        for s in smart_car.sprite.robot.distance_sensors
+    ]
+    nn_outputs = smart_car.sprite.decision_maker.decide(sensor_distances)
+    scaled_outputs = [
+        oi * smart_car.sprite.robot.control_input_upper_limit for oi in nn_outputs
+    ]
+    left_pwm = smart_car.sprite.robot.left_pwm
+    right_pwm = smart_car.sprite.robot.right_pwm
+    angle = smart_car.sprite.robot.angle_deg
+
+    debug_text = (
+        f"NN outputs: {', '.join(f'{o:8.4}' for o in nn_outputs)} | "
+        f"Scaled: {', '.join(f'{o:8.4}' for o in scaled_outputs)} | "
+        f"PWM L:{left_pwm:8.4} R:{right_pwm:8.4} | "
+        f"Angle: {angle:8.4}"
+    )
+
+    text_surface = font.render(sensor_text, True, (255, 255, 255))
+    debug_surface = font.render(debug_text, True, (255, 255, 0))
+    screen.blit(text_surface, (10, 10))
+    screen.blit(debug_surface, (10, 30))
+
+def run_simulation(screen, clock, course : GridCoverageCourse) -> bool:
+    
     running = True
     dt = 0
+    previous_coverage = 0.0
+    coverage_stale_count = 0
 
     # Instantiate three SharpIR sensors at different angles
     sensors = [
@@ -45,7 +110,7 @@ def run_simulation(screen, clock):
     ]
     
     # Create the robot and decision maker
-    robot_instance = TwoWheelTT(640, 360, distance_sensors=sensors)
+    robot_instance = TwoWheelTT(75, 75, distance_sensors=sensors)
     decision_maker = FFNetDecisionMaker([3, 4, 2])
     #set_weights(self, weights: list[list[list[float]]], biases: list[list[float]])
     weights = [
@@ -61,9 +126,8 @@ def run_simulation(screen, clock):
     smart_car.add(SmartCar(robot=robot_instance, decision_maker=decision_maker))
 
     obstacles = pygame.sprite.Group()
-    obstacles.add(Obstacle(200, 300, 100, 30))
-    obstacles.add(Obstacle(400, 500, 50, 100))
-    obstacles.add(Obstacle(600, 250, 100, 25))
+    for obs in course.make_course():
+        obstacles.add(obs)
 
     while running:
         # poll for events
@@ -74,29 +138,22 @@ def run_simulation(screen, clock):
             if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
                 return True  # Restart the simulation
 
-        # Example: simple autonomous behavior
-        # if random.random() < 0.05:  # Occasionally change direction
-        #     robot.sprite.left_pwm = random.randint(0, 255)
-        #     robot.sprite.right_pwm = random.randint(0, 255)
-        # keys = pygame.key.get_pressed()
-
-        # # Adjust left PWM with A/D
-        # if keys[pygame.K_a]:
-        #     robot.sprite.right_pwm = max(0, robot.sprite.right_pwm - 1)
-        #     robot.sprite.left_pwm = max(0, robot.sprite.left_pwm +1)
-        # if keys[pygame.K_d]:
-        #     robot.sprite.right_pwm = max(0, robot.sprite.right_pwm + 1)
-        #     robot.sprite.left_pwm = max(0, robot.sprite.left_pwm - 1)
-
-        # # Adjust both left and right PWM with W/S
-        # if keys[pygame.K_s]:
-        #     robot.sprite.right_pwm = max(0, robot.sprite.right_pwm - 2)
-        #     robot.sprite.left_pwm = max(0, robot.sprite.left_pwm - 2)
-        # if keys[pygame.K_w]:
-        #     robot.sprite.right_pwm = min(255, robot.sprite.right_pwm + 2)
-        #     robot.sprite.left_pwm = min(255, robot.sprite.left_pwm + 2)
-
         smart_car.update(dt, obstacles)
+
+        course.mark_visited(smart_car.sprite.robot.position.x,
+                            smart_car.sprite.robot.position.y)
+        
+        current_coverage = course.coverage_ratio()
+        if current_coverage > previous_coverage:
+            coverage_stale_count = 0
+        else:
+            coverage_stale_count += 1
+
+        previous_coverage = current_coverage
+
+        if coverage_stale_count > COVERAGE_ABORT_S * FRAME_RATE:
+            # If coverage hasn't improved for a while, restart the simulation
+            return True
 
         if pygame.sprite.spritecollide(
             smart_car.sprite.robot, obstacles, dokill=False, collided=circle_rect_collision):
@@ -108,30 +165,24 @@ def run_simulation(screen, clock):
         smart_car.draw(screen)
         obstacles.draw(screen)
 
-        # --- Display sensor measurements ---
-        font = pygame.font.Font(None, 28)
-        sensor_text = "Sensors: " + ", ".join(
-            f"{s.last_distance_m:.2f}" if s.last_distance_m is not None else "N/A"
-            for s in smart_car.sprite.robot.distance_sensors
-        )
-        text_surface = font.render(sensor_text, True, (255, 255, 255))
-        screen.blit(text_surface, (10, 10))
-        # --- End sensor display ---
+        show_debug_info(screen, smart_car)
 
         pygame.display.flip()
 
         # limits FPS to 60
         # dt is delta time in seconds since last frame, used for framerate-
         # independent physics.
-        dt = clock.tick(60) / 1000
+        dt = clock.tick(FRAME_RATE) / 1000
 
 def main():
     pygame.init()
-    screen = pygame.display.set_mode((1280, 720))
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
     clock = pygame.time.Clock()
 
     while True:
-        restart = run_simulation(screen, clock)
+        course = GridCoverageCourseA(WIDTH, HEIGHT)
+        restart = run_simulation(screen, clock, course)
+        show_coverage_screen(screen, clock, course)
         if not restart:
             break
 

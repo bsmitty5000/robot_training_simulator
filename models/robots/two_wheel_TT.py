@@ -47,12 +47,12 @@ class TwoWheelTT(RobotBase):
         self.angular_velocity = 0.0  # Current rotation speed
 
         self.max_acceleration = 100.0  # M/sec^2
-        self.max_angular_acceleration = 180.0  # deg/sec^2
+        self.max_angular_acceleration_deg = 180.0  # deg/sec^2
 
         self.left_pwm = 0.0
         self.right_pwm = 0.0
 
-        self.angle = 0
+        self.angle_deg = -90.0  # Initial angle in degrees, facing right
         self.speed = 0.0
         self.rotation_speed = 0.0
         self.max_speed = 50.0
@@ -100,14 +100,14 @@ class TwoWheelTT(RobotBase):
 
         # Angular velocity
         rot_diff = target_rotation_speed - self.angular_velocity
-        max_rot_change = self.max_angular_acceleration * dt
+        max_rot_change = self.max_angular_acceleration_deg * dt
         if abs(rot_diff) > max_rot_change:
             rot_diff = max_rot_change if rot_diff > 0 else -max_rot_change
         self.angular_velocity += rot_diff
 
         # 3. Update angle and position
-        self.angle += self.angular_velocity * dt
-        direction = pygame.Vector2(0, -1).rotate(-self.angle)
+        self.angle_deg = (self.angle_deg + self.angular_velocity * dt) % 360
+        direction = pygame.Vector2(0, -1).rotate(-self.angle_deg)
         self.position += direction * self.velocity * dt
 
     def update_coordinates(self):
@@ -122,20 +122,20 @@ class TwoWheelTT(RobotBase):
             sensor.draw(self.image, sensor_position)
 
         # 3. Rotate
-        self.image = pygame.transform.rotate(self.image, self.angle)
+        self.image = pygame.transform.rotate(self.image, self.angle_deg)
         self.rect = self.image.get_rect(center=self.position)
 
     def detect(self, obstacles: Sequence[pygame.sprite.Sprite]) -> None:
         # Use each sensor's measure method
         for sensor in self.distance_sensors:
             
-            sensor_direction = pygame.Vector2(0, -1).rotate(sensor.angle_deg - self.angle)
+            sensor_direction = pygame.Vector2(0, -1).rotate(sensor.angle_deg - self.angle_deg)
             sensor_position = self.position + sensor_direction * self.robot_radius_px
             #sensor_position = self.position + pygame.Vector2().from_polar((self.robot_radius_px, sensor.angle_deg-self.angle))
             #sensor_position = self.position + pygame.Vector2().from_polar((self.robot_radius_px, self.angle + sensor.angle_deg))
             # vec = pygame.Vector2()
             # vec.from_polar((self.robot_radius_px, sensor.angle_deg - self.angle))
             # sensor_position = self.position + vec
-            sensor.measure(sensor_position, self.angle, obstacles)
+            sensor.measure(sensor_position, self.angle_deg, obstacles)
                 
 

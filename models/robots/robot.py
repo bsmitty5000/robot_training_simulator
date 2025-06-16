@@ -6,7 +6,7 @@ from models.distance_sensors.distance_sensor import DistanceSensor
 
 class RobotBase(pygame.sprite.Sprite, ABC):
     position: pygame.Vector2
-    angle: float
+    angle_deg: float
     velocity: float
     angular_velocity: float
     distance_sensors: Optional[Sequence[DistanceSensor]]
@@ -17,7 +17,7 @@ class RobotBase(pygame.sprite.Sprite, ABC):
                  distance_sensors: Optional[Sequence[DistanceSensor]]=None) -> None:
         super().__init__()
         self.position = pygame.Vector2(x, y)
-        self.angle = 0.0
+        self.angle_deg = 0.0
         self.velocity = 0.0
         self.angular_velocity = 0.0
         self.distance_sensors = distance_sensors if distance_sensors is not None else []
