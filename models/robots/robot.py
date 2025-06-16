@@ -21,6 +21,24 @@ class RobotBase(pygame.sprite.Sprite, ABC):
         self.velocity = 0.0
         self.angular_velocity = 0.0
         self.distance_sensors = distance_sensors if distance_sensors is not None else []
+    
+    @property
+    @abstractmethod
+    def control_input_size(self) -> int:
+        """Number of control inputs expected by this robot in update_kinematics."""
+        pass
+    
+    @property
+    @abstractmethod
+    def control_input_upper_limit(self) -> int:
+        """Upper limit on control input inclusive."""
+        pass
+    
+    @property
+    @abstractmethod
+    def control_input_lower_limit(self) -> int:
+        """Lower limit on control input inclusive."""
+        pass
 
     @abstractmethod
     def update(self, dt: float, obstacles: Sequence[pygame.sprite.Sprite]) -> None:
@@ -28,8 +46,10 @@ class RobotBase(pygame.sprite.Sprite, ABC):
         pass
 
     @abstractmethod
-    def update_kinematics(self, dt: float) -> None:
-        """Update the robot's kinematics (velocity, angle, etc)."""
+    def update_kinematics(self, dt: float, control_inputs: Sequence[float]) -> None:
+        """
+        Update the robot's kinematics using the provided control inputs.
+        """
         pass
 
     @abstractmethod

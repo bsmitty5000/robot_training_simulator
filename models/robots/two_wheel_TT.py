@@ -40,19 +40,6 @@ class TwoWheelTT(RobotBase):
 
         self.position = pygame.Vector2(x, y)
 
-        # Sensors start on outer edge of robot
-        for sensor in self.distance_sensors:
-            
-            sensor_angle_rad = math.radians(sensor.angle_deg - 90)  
-            sensor_range_px = int(sensor.max_range_m * constants.PIXELS_PER_METER)
-
-            start_pos = (robot_footprint_radius_px + self.robot_radius_px * math.cos(sensor_angle_rad), 
-                         robot_footprint_radius_px + self.robot_radius_px * math.sin(sensor_angle_rad))
-            end_pos = (robot_footprint_radius_px + sensor_range_px * math.cos(sensor_angle_rad), 
-                       robot_footprint_radius_px + sensor_range_px * math.sin(sensor_angle_rad))
-
-            pygame.draw.line(self.original_image, (0, 0, 255), start_pos, end_pos, 2)
-
         self.image = self.original_image.copy()
         self.rect = self.image.get_rect(center=(x, y))
 
@@ -75,11 +62,26 @@ class TwoWheelTT(RobotBase):
 
         self.update_kinematics(dt)
 
-        self.update_coordinates()
-
         self.detect(obstacles)
 
-    def update_kinematics(self, dt: float) -> None:
+        self.update_coordinates()
+    
+    @property
+    def control_input_size(self) -> int:
+        return 2
+    
+    @property
+    def control_input_upper_limit(self) -> int:
+        return 255
+    
+    @property
+    def control_input_lower_limit(self) -> int:
+        return -255
+    
+    def update_kinematics(self, dt: float, control_inputs: Sequence[float]) -> None:
+
+        self.left_pwm = control_inputs[0] if len(control_inputs) > 0 else self.left_pwm
+        self.right_pwm = control_inputs[1] if len(control_inputs) > 1 else self.left_pwm
 
         # 1. Calculate target speeds from PWM
         avg_pwm = (self.left_pwm + self.right_pwm) / 2
@@ -108,12 +110,20 @@ class TwoWheelTT(RobotBase):
         direction = pygame.Vector2(0, -1).rotate(-self.angle)
         self.position += direction * self.velocity * dt
 
-    def update_coordinates(self) -> None:
-        ### Update coordinates for rect.center and each sensor
-        ### should be called after self.position and self.angle are updated
-        self.rect.center = self.position
-        self.image = pygame.transform.rotate(self.original_image, self.angle)
-        self.rect = self.image.get_rect(center=self.rect.center)
+    def update_coordinates(self):
+        # 1. Start with a fresh copy of the base image
+        self.image = self.original_image.copy()
+        center_offset = pygame.Vector2(self.image.get_width() // 2, self.image.get_height() // 2)
+
+        # 2. Have the sensors draw themselves on an unrotated image
+        for sensor in self.distance_sensors:
+            sensor_direction = pygame.Vector2(0, -1).rotate(sensor.angle_deg)
+            sensor_position = center_offset + sensor_direction * self.robot_radius_px
+            sensor.draw(self.image, sensor_position)
+
+        # 3. Rotate
+        self.image = pygame.transform.rotate(self.image, self.angle)
+        self.rect = self.image.get_rect(center=self.position)
 
     def detect(self, obstacles: Sequence[pygame.sprite.Sprite]) -> None:
         # Use each sensor's measure method
