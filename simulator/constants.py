@@ -6,5 +6,5 @@ FRAME_RATE = 20
 COVERAGE_ABORT_S = 5
 SIM_DT = 1.0 / FRAME_RATE  # Simulation time step in seconds
 HEADLESS_MODE = True  # If True, run without a GUI for faster simulations
-LOG_FILE_TO_SEED = r"C:\Users\Batman\projects\remote_robot\simulation\ga_20250617_081545.log"
-DEMO_RUN = True  # If True, run a demo with a fixed genotype
+LOG_FILE_TO_SEED = "" #r"test_genotype.txt"
+DEMO_RUN = False  # If True, run a demo with a fixed genotype

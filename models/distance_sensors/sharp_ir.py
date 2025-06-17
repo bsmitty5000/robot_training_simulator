@@ -33,5 +33,5 @@ class SharpIR(DistanceSensor):
         end = self.get_sensor_direction()
         end = sensor_position + end * self.last_distance_m
 
-        pygame.draw.line(surface, (0, 0, 255), sensor_position, end, 1)
+        pygame.draw.line(surface, (255, 180, 255), sensor_position, end, 1)
     

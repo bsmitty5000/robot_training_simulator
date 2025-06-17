@@ -63,17 +63,18 @@ class GeneticAlgorithmController:
         smart_car = SmartCar(robot_instance, decision_maker)
         course = GridCoverageCourseA(width, height)
         # Run simulation headless (no display) or with display as needed
-        self.run_simulation(screen, clock, smart_car, course)
-        fitness = course.coverage_ratio()
+        sim_time = self.run_simulation(screen, clock, smart_car, course) * constants.SIM_DT
+        coverage = course.coverage_ratio()
+        fitness = coverage * 1000.0 / sim_time
         logging.info(
-            f"Gen {generation} Ind {individual_idx}: Fitness={fitness:.4f} Genetics={smart_car.decision_maker.print_info()}"
+            f"Gen {generation} Ind {individual_idx}: Coverage={coverage:.4f}: Time={sim_time:.4f}: Fitness={fitness:.4f} Genetics={smart_car.decision_maker.print_info()}"
         )
         return fitness
 
     def run_simulation(self, screen, clock, smart_car, course):
         
         running = True
-        dt = 0
+        total_frames = 0
         previous_coverage = 0.0
         coverage_stale_count = 0
 
@@ -89,9 +90,9 @@ class GeneticAlgorithmController:
             # pygame.QUIT event means the user clicked X to close your window
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    return False  # Exit the simulation
+                    return total_frames
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-                    return True  # Restart the simulation
+                    return total_frames
 
             sc_sprite.update(constants.SIM_DT, obstacles)
 
@@ -108,11 +109,13 @@ class GeneticAlgorithmController:
 
             if coverage_stale_count > constants.COVERAGE_ABORT_S * constants.FRAME_RATE:
                 # If coverage hasn't improved for a while, restart the simulation
-                return True
+                return total_frames
 
             if pygame.sprite.spritecollide(
                 sc_sprite.sprite.robot, obstacles, dokill=False, collided=helpers.circle_rect_collision):
-                return True
+                return total_frames
+
+            total_frames += 1
 
             # fill the screen with a color to wipe away anything from last frame
             if constants.DEMO_RUN or not constants.HEADLESS_MODE:
@@ -126,6 +129,8 @@ class GeneticAlgorithmController:
                 pygame.display.flip()
                 
                 clock.tick(constants.FRAME_RATE)
+        
+        return total_frames
 
     def evolve(self, screen, clock, width, height):
         for gen in range(self.n_generations):

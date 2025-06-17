@@ -58,6 +58,7 @@ class FFNetDecisionMaker(DecisionBase):
         weights: list[list[list[float]]] = []
         biases: list[list[float]] = []
         layer_sizes: list[int] = []
+        idx = 0
 
         if 'layer_sizes' in kwargs:
                 layer_sizes = kwargs['layer_sizes']
@@ -67,13 +68,13 @@ class FFNetDecisionMaker(DecisionBase):
         for l in range(num_layers):
             n_in = layer_sizes[l]
             n_out = layer_sizes[l + 1]
-            W_start = l * n_in * n_out
-            W_end = W_start + n_in * n_out
-            b_start = W_end
-            b_end = b_start + n_out
-            
-            W_flat = genotype[W_start:W_end]
-            b_flat = genotype[b_start:b_end]
+            weights_len = layer_sizes[l] * layer_sizes[l + 1]
+            biases_len = layer_sizes[l + 1]
+
+            W_flat = genotype[idx:idx + weights_len]
+            b_flat = genotype[idx + weights_len:idx + weights_len + biases_len]
+
+            idx += (weights_len + biases_len)
             
             W = np.array(W_flat).reshape((n_in, n_out))
             b = np.array(b_flat)

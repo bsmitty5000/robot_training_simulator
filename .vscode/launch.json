@@ -8,6 +8,19 @@
             "module": "simulator.main",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Profile simulator.main",
+            "type": "debugpy",                  // same type as your current config
+            "request": "launch",
+            "module": "cProfile",               // ← run as “python -m cProfile”
+            "args": [
+                "-o", "${workspaceFolder}/sim.prof",  // write stats to sim.prof
+                "${workspaceFolder}/simulator/main.py"                      // then invoke your module
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
         }
+
     ]
 }

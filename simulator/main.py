@@ -43,16 +43,16 @@ def main():
     screen = pygame.display.set_mode((constants.WIDTH, constants.HEIGHT))
     clock = pygame.time.Clock()
     layer_sizes, best_fitness, best_genotype = None, 0.0, None
-    if constants.LOG_FILE_TO_SEED:
+    if os.path.exists(constants.LOG_FILE_TO_SEED):
         layer_sizes, best_fitness, best_genotype = parse_log_file(constants.LOG_FILE_TO_SEED)
         print(f"Seeding with previous genotype that had fitness of: {best_fitness}")
 
-    ga = GeneticAlgorithmController(pop_size=20, 
+    ga = GeneticAlgorithmController(pop_size=40, 
                                     n_generations=5, 
                                     layer_sizes=layer_sizes, 
                                     initial_genotype=best_genotype)
     if constants.DEMO_RUN:
-        weights, biases = FFNetDecisionMaker.from_genotype(best_genotype, layer_sizes=layer_sizes)
+        weights, biases = FFNetDecisionMaker.from_genotype(best_genotype, layer_sizes=ga.layer_sizes)
         ga.evaluate_individual(weights, biases, 
                                 screen, clock, 
                                 constants.WIDTH, constants.HEIGHT, 
@@ -62,15 +62,15 @@ def main():
         fitness_history = ga.run(screen, clock, 
             constants.WIDTH, constants.HEIGHT,
                 cx_rate=0.7,
-                mut_rate=0.01)
+                mut_rate=0.03)
         
         
-        plt.plot(fitness_history)
-        plt.title("Best Fitness over Generations")
-        plt.xlabel("Generation")
-        plt.ylabel("Fitness")
-        plt.ioff()
-        plt.show()
+        # plt.plot(fitness_history)
+        # plt.title("Best Fitness over Generations")
+        # plt.xlabel("Generation")
+        # plt.ylabel("Fitness")
+        # plt.ioff()
+        # plt.show()
     
     pygame.quit()
     sys.exit()
