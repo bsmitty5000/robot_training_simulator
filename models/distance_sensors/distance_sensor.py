@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Sequence, Optional
 import pygame
 
-from models import constants
+from simulator import constants
 
 class DistanceSensor(ABC):
     angle_deg: float

@@ -1,6 +1,6 @@
 # Example: courses/boundary_course.py
 from courses.grid_coverage_course import GridCoverageCourse
-from models import constants
+from simulator import constants
 from models.obstacle import Obstacle
 
 class GridCoverageCourseA(GridCoverageCourse):

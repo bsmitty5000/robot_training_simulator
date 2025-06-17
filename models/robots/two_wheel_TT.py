@@ -1,8 +1,7 @@
 
 from collections.abc import Sequence
 import pygame
-import math
-import models.constants as constants
+import simulator.constants as constants
 from models.distance_sensors.distance_sensor import DistanceSensor
 from models.robots.robot import RobotBase
 
@@ -26,17 +25,18 @@ class TwoWheelTT(RobotBase):
         self.original_image = pygame.Surface(surface_size, pygame.SRCALPHA)
         self.robot_radius_px = int((robot_diameter_m * constants.PIXELS_PER_METER) / 2)
 
-        pygame.draw.circle(self.original_image, 
-                           (255, 0, 0), 
-                           (robot_footprint_radius_px, robot_footprint_radius_px), 
-                           self.robot_radius_px)
-        
-        # direction line
-        pygame.draw.line(self.original_image, 
-                         (0, 255, 0), 
-                         (robot_footprint_radius_px, robot_footprint_radius_px), 
-                         (robot_footprint_radius_px, robot_footprint_radius_px - self.robot_radius_px),
-                         5)
+        if constants.DEMO_RUN or not constants.HEADLESS_MODE:
+            pygame.draw.circle(self.original_image, 
+                            (255, 0, 0), 
+                            (robot_footprint_radius_px, robot_footprint_radius_px), 
+                            self.robot_radius_px)
+            
+            # direction line
+            pygame.draw.line(self.original_image, 
+                            (0, 255, 0), 
+                            (robot_footprint_radius_px, robot_footprint_radius_px), 
+                            (robot_footprint_radius_px, robot_footprint_radius_px - self.robot_radius_px),
+                            5)
 
         self.position = pygame.Vector2(x, y)
 
@@ -119,7 +119,8 @@ class TwoWheelTT(RobotBase):
         for sensor in self.distance_sensors:
             sensor_direction = pygame.Vector2(0, -1).rotate(sensor.angle_deg)
             sensor_position = center_offset + sensor_direction * self.robot_radius_px
-            sensor.draw(self.image, sensor_position)
+            if constants.DEMO_RUN or not constants.HEADLESS_MODE:
+                sensor.draw(self.image, sensor_position)
 
         # 3. Rotate
         self.image = pygame.transform.rotate(self.image, self.angle_deg)
