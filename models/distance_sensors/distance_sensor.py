@@ -21,11 +21,6 @@ class DistanceSensor(ABC):
         return core.Vector2(0, -1).rotate(self.angle_deg - robot_angle)
 
     @abstractmethod
-    def draw(self, surface: core.Surface, sensor_position: core.Vector2) -> None:
-        """Draw the sensor visualization on the given surface."""
-        pass
-
-    @abstractmethod
     def measure(
         self,
         sensor_position: core.Vector2,

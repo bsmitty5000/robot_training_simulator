@@ -1,12 +1,9 @@
 import re
-import sys
+import os
 
 from matplotlib import pyplot as plt
 from ml_stuff.ff_net_decision_maker import FFNetDecisionMaker
 import simulator.constants as constants
-if not constants.DEMO_RUN and constants.HEADLESS_MODE:
-    import os
-    os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 from controllers.genetic_algorithm_controller import GeneticAlgorithmController
 
@@ -39,28 +36,23 @@ def parse_log_file(filename):
     return layer_sizes, best_fitness, best_genotype
 
 def main():
-    pygame.init()
-    screen = pygame.display.set_mode((constants.WIDTH, constants.HEIGHT))
-    clock = pygame.time.Clock()
     layer_sizes, best_fitness, best_genotype = None, 0.0, None
     if os.path.exists(constants.LOG_FILE_TO_SEED):
         layer_sizes, best_fitness, best_genotype = parse_log_file(constants.LOG_FILE_TO_SEED)
         print(f"Seeding with previous genotype that had fitness of: {best_fitness}")
 
-    ga = GeneticAlgorithmController(pop_size=40, 
+    ga = GeneticAlgorithmController(pop_size=10, 
                                     n_generations=5, 
                                     layer_sizes=layer_sizes, 
                                     initial_genotype=best_genotype)
     if constants.DEMO_RUN:
         weights, biases = FFNetDecisionMaker.from_genotype(best_genotype, layer_sizes=ga.layer_sizes)
-        ga.evaluate_individual(weights, biases, 
-                                screen, clock, 
+        ga.evaluate_individual(weights, biases,
                                 constants.WIDTH, constants.HEIGHT, 
                                 individual_idx=0, generation=0)
     else:
         #ga.evolve(screen, clock, constants.WIDTH, constants.HEIGHT)
-        fitness_history = ga.run(screen, clock, 
-            constants.WIDTH, constants.HEIGHT,
+        fitness_history = ga.run(constants.WIDTH, constants.HEIGHT,
                 cx_rate=0.7,
                 mut_rate=0.03)
         
@@ -72,8 +64,5 @@ def main():
         # plt.ioff()
         # plt.show()
     
-    pygame.quit()
-    sys.exit()
-
 if __name__ == "__main__":
     main()

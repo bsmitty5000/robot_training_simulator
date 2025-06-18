@@ -18,10 +18,11 @@ class SharpIR(DistanceSensor):
 
         # Raycast: check for intersection with each obstacle rect
         min_dist = self.max_range_px
+        sensor_ray = core.LineSegment(sensor_position, end)
         for obstacle in obstacles:
-            clipped = obstacle.clipline(sensor_position, end)
+            clipped = obstacle.clipline(sensor_ray)
             if clipped:
-                hit_point = core.Vector2(clipped[0])
+                hit_point = clipped[0]
                 dist = sensor_position.distance_to(hit_point)
                 if dist < min_dist:
                     min_dist = dist

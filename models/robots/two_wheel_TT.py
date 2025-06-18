@@ -129,7 +129,7 @@ class TwoWheelTT(RobotBase):
         for sensor in self.distance_sensors:
             
             sensor_direction = core.Vector2(0, -1).rotate(sensor.angle_deg - self.angle_deg)
-            sensor_position = self.circle.area + sensor_direction * self.circle.radius
+            sensor_position = self.circle.center + sensor_direction * self.circle.radius
             #sensor_position = self.position + pygame.Vector2().from_polar((self.robot_radius_px, sensor.angle_deg-self.angle))
             #sensor_position = self.position + pygame.Vector2().from_polar((self.robot_radius_px, self.angle + sensor.angle_deg))
             # vec = pygame.Vector2()
