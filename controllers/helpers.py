@@ -15,20 +15,6 @@ class DummyDecision(DecisionBase):
         # Always go forward at medium speed
         return [128.0, 128.0]
     
-def circle_rect_collision(robot_sprite : RobotBase, obstacle_sprite : Obstacle) -> bool:
-    # Get robot center and radius
-    center = pygame.Vector2(robot_sprite.rect.center)
-    radius = robot_sprite.robot_radius_px
-
-    # Get the closest point on the obstacle's rect to the robot's center
-    closest = pygame.Vector2(
-        max(obstacle_sprite.rect.left, min(center.x, obstacle_sprite.rect.right)),
-        max(obstacle_sprite.rect.top, min(center.y, obstacle_sprite.rect.bottom))
-    )
-
-    # Check if the distance is less than the radius
-    return center.distance_to(closest) < radius
-
 def show_coverage_screen(screen, clock, course: GridCoverageCourse):
     font = pygame.font.SysFont("consolas", 36)
     coverage = course.coverage_ratio() * 100

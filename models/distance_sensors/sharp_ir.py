@@ -1,5 +1,6 @@
-import pygame
 from typing import Sequence
+
+from sim import core
 from .distance_sensor import DistanceSensor
 
 class SharpIR(DistanceSensor):
@@ -8,9 +9,9 @@ class SharpIR(DistanceSensor):
 
     def measure(
         self,
-        sensor_position: pygame.Vector2,
+        sensor_position: core.Vector2,
         robot_angle: float,
-        obstacles: Sequence[pygame.sprite.Sprite]) -> float:
+        obstacles: Sequence[core.Shape]) -> float:
 
         end = self.get_sensor_direction(robot_angle)
         end = sensor_position + end * self.max_range_px
@@ -18,20 +19,20 @@ class SharpIR(DistanceSensor):
         # Raycast: check for intersection with each obstacle rect
         min_dist = self.max_range_px
         for obstacle in obstacles:
-            clipped = obstacle.rect.clipline(sensor_position, end)
+            clipped = obstacle.clipline(sensor_position, end)
             if clipped:
-                hit_point = pygame.Vector2(clipped[0])
+                hit_point = core.Vector2(clipped[0])
                 dist = sensor_position.distance_to(hit_point)
                 if dist < min_dist:
                     min_dist = dist
         self.last_distance_m = min_dist
         return min_dist
     
-    def draw(self, surface, sensor_position):
-        # Compute start and end points
-        # Draw the line up to the collision point
-        end = self.get_sensor_direction()
-        end = sensor_position + end * self.last_distance_m
+    # def draw(self, surface, sensor_position):
+    #     # Compute start and end points
+    #     # Draw the line up to the collision point
+    #     end = self.get_sensor_direction()
+    #     end = sensor_position + end * self.last_distance_m
 
-        pygame.draw.line(surface, (255, 180, 255), sensor_position, end, 1)
+    #     pygame.draw.line(surface, (255, 180, 255), sensor_position, end, 1)
     

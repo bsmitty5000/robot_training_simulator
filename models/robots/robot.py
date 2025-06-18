@@ -1,11 +1,11 @@
-import pygame
 from abc import ABC, abstractmethod
 from typing import Any, Sequence, Optional
 
 from models.distance_sensors.distance_sensor import DistanceSensor
+from sim import core
 
-class RobotBase(pygame.sprite.Sprite, ABC):
-    position: pygame.Vector2
+class RobotBase(ABC):
+    position: core.Vector2
     angle_deg: float
     velocity: float
     angular_velocity: float
@@ -16,7 +16,7 @@ class RobotBase(pygame.sprite.Sprite, ABC):
                  y: float, 
                  distance_sensors: Optional[Sequence[DistanceSensor]]=None) -> None:
         super().__init__()
-        self.position = pygame.Vector2(x, y)
+        self.position = core.Vector2(x, y)
         self.angle_deg = 0.0
         self.velocity = 0.0
         self.angular_velocity = 0.0
@@ -39,25 +39,27 @@ class RobotBase(pygame.sprite.Sprite, ABC):
     def control_input_lower_limit(self) -> int:
         """Lower limit on control input inclusive."""
         pass
-
+    
+    @property
     @abstractmethod
-    def update(self, dt: float, obstacles: Sequence[pygame.sprite.Sprite]) -> None:
-        """Update the robot's state (position, sensors, etc)."""
+    def x_coordinate(self):
+        """Current X position."""
+        pass
+    
+    @property
+    @abstractmethod
+    def y_coordinate(self):
+        """Current Y position."""
         pass
 
     @abstractmethod
-    def update_kinematics(self, dt: float, control_inputs: Sequence[float]) -> None:
+    def move(self, dt: float, control_inputs: Sequence[float]) -> None:
         """
-        Update the robot's kinematics using the provided control inputs.
+        Use control_inputs to update the robot's position after dt seconds
         """
         pass
 
     @abstractmethod
-    def update_coordinates(self) -> None:
-        """Update the robot's coordinates and image for rendering."""
-        pass
-
-    @abstractmethod
-    def detect(self, obstacles: Sequence[pygame.sprite.Sprite]) -> None:
+    def detect(self, obstacles: Sequence[core.Shape]) -> None:
         """Update the robot's sensors based on obstacles."""
         pass

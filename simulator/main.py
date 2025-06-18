@@ -7,7 +7,7 @@ import simulator.constants as constants
 if not constants.DEMO_RUN and constants.HEADLESS_MODE:
     import os
     os.environ["SDL_VIDEODRIVER"] = "dummy"
-import pygame
+
 from controllers.genetic_algorithm_controller import GeneticAlgorithmController
 
 def parse_log_file(filename):
