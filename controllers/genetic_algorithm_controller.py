@@ -9,7 +9,6 @@ from smart_car.smart_car import SmartCar
 from models.robots.two_wheel_TT import TwoWheelTT
 from models.distance_sensors.sharp_ir import SharpIR
 from courses.course1 import GridCoverageCourseA
-import controllers.helpers as helpers
 import logging
 from datetime import datetime
 

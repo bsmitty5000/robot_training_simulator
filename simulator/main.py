@@ -1,7 +1,6 @@
 import re
 import os
 
-from matplotlib import pyplot as plt
 from ml_stuff.ff_net_decision_maker import FFNetDecisionMaker
 import simulator.constants as constants
 
@@ -41,7 +40,7 @@ def main():
         layer_sizes, best_fitness, best_genotype = parse_log_file(constants.LOG_FILE_TO_SEED)
         print(f"Seeding with previous genotype that had fitness of: {best_fitness}")
 
-    ga = GeneticAlgorithmController(pop_size=10, 
+    ga = GeneticAlgorithmController(pop_size=40, 
                                     n_generations=5, 
                                     layer_sizes=layer_sizes, 
                                     initial_genotype=best_genotype)
