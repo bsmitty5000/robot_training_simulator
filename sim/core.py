@@ -86,6 +86,13 @@ class Shape(ABC):
         """Calculate the area of the shape."""
         pass
 
+    @abstractmethod
+    def min_distance_to(self, point: Vector2) -> float:
+        """ Calculates the distance from a point to the closest
+            location on Shape
+        """
+        pass
+
 @dataclass
 class Rect(Shape):
     x: float
@@ -129,64 +136,48 @@ class Rect(Shape):
         # Returns the coordinates of a line that is cropped to be completely inside the rectangle, 
         # otherwise None.
 
-        p1 = -(line.end.x - line.start.x)
-        p2 = -p1
-        p3 = -(line.end.y - line.start.y)
-        p4 = -p3
+        dx = line.end.x - line.start.x
+        dy = line.end.y - line.start.y
 
-        q1 = line.start.x - self.left
-        q2 = self.right - line.start.x
-        q3 = line.start.y - self.top
-        q4 = self.bottom - line.start.y
+        t_enter = 0.0
+        t_exit = 1.0
 
-        exitParams = []
-        entryParams = []
-        exitParams.append(1)
-        entryParams.append(0)
+        p = [-dx, dx, -dy, dy]
+        q = [line.start.x - self.left, self.right - line.start.x, line.start.y - self.top, self.bottom - line.start.y]
 
-        if ((p1 == 0 and q1 < 0) or (p2 == 0 and q2 < 0) or (p3 == 0 and q3 < 0) or (p4 == 0 and q4 < 0)):
-            # Line is outside the clipping window
-            return None
-        
-        if (p1 != 0):
-            r1 = q1 / p1
-            r2 = q2 / p2
-            if (p1 < 0):
-                entryParams.append(r1)
-                exitParams.append(r2)
-            else :
-                entryParams.append(r2)
-                exitParams.append(r1)
-        
-        if (p3 != 0):
-            r3 = q3 / p3
-            r4 = q4 / p4
-            if (p3 < 0):
-                entryParams.append(r3)
-                exitParams.append(r4)
-            else :
-                entryParams.append(r4)
-                exitParams.append(r3)
+        for i in range(4):
+            if p[i] == 0:  # Line parallel to boundary
+                if q[i] < 0:  # Line is outside the boundary
+                    return None
+            else:
+                t = q[i] / p[i]
+                if p[i] < 0:  # Entering intersection
+                    t_enter = max(t_enter, t)
+                else:  # Exiting intersection
+                    t_exit = min(t_exit, t)
 
-        u1 = max(entryParams)
-        u2 = min(exitParams)
-
-        if (u1 > u2):
+        if t_enter > t_exit:  # Line is completely outside
             return None
 
         return LineSegment(
             start=Vector2(
-                line.start.x + (line.end.x - line.start.x) * u1,
-                line.start.y + (line.end.y - line.start.y) * u1
+                line.start.x + t_enter * dx,
+                line.start.y + t_enter * dy
             ),
             end=Vector2(
-                line.start.x + (line.end.x - line.start.x) * u2,
-                line.start.y + (line.end.y - line.start.y) * u2
+                line.start.x + t_exit * dx,
+                line.start.y + t_exit * dy
             )
         )
 
     def area(self):
         return self.w * self.h
+    
+    def min_distance_to(self, point: Vector2) -> float:
+        closestPoint = Vector2( max(self.left, min(point.x, self.right)),
+                                max(self.top, min(point.y, self.bottom)))
+        
+        return closestPoint.distance_to(point)
 
 @dataclass
 class Circle(Shape):
@@ -252,6 +243,10 @@ class Circle(Shape):
 
     def area(self) -> float:
         return math.pi * self.radius ** 2
+    
+    def min_distance_to(self, point: Vector2) -> float:
+        
+        return self.clipline(LineSegment(point, self.center))[0]
 
 def circle_rect_collision(circle : Circle, rect : Rect) -> bool:
     
@@ -321,6 +316,7 @@ def test_rect_clipline():
     # 6. Line tangent to rectangle
     line6 = LineSegment(Vector2(0, 3), Vector2(10, 3))
     print("Rect Test 6 (tangent):", rect.clipline(line6))
+
 
 def test_circle_clipline():
     circle = Circle(center=Vector2(5, 5), radius=2)
