@@ -51,9 +51,14 @@ def main():
                                 individual_idx=0, generation=0)
     else:
         #ga.evolve(screen, clock, constants.WIDTH, constants.HEIGHT)
+        cx_rate = 0.7
+        mut_rate = 0.03
+        if constants.NO_RANDOM:
+            cx_rate = 0.0
+            mut_rate = 0.0
         fitness_history = ga.run(constants.WIDTH, constants.HEIGHT,
-                cx_rate=0.7,
-                mut_rate=0.03)
+                cx_rate=cx_rate,
+                mut_rate=mut_rate)
         
         
         # plt.plot(fitness_history)

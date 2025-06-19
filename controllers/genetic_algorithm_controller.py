@@ -28,13 +28,20 @@ class GeneticAlgorithmController:
         self.n_generations = n_generations
         self.layer_sizes = layer_sizes if layer_sizes is not None else [3, 4, 2]  # Default layer sizes
         self.population: List[Tuple[List[np.ndarray], List[np.ndarray]]] = []
-        if initial_genotype is not None:
-            for _ in range(pop_size // 2):
-                mutated = FFNetDecisionMaker.from_genotype(self.mutate(initial_genotype, rate=1.0), 
-                                                           layer_sizes=self.layer_sizes)
-                self.population.append(mutated)
-        for _ in range(len(self.population), pop_size):
-            self.population.append(self.random_individual())
+         
+        if constants.NO_RANDOM:
+            for _ in range(pop_size):
+                self.population.append(FFNetDecisionMaker.from_genotype(initial_genotype, 
+                                                           layer_sizes=self.layer_sizes))
+
+        else:
+            if initial_genotype is not None:
+                for _ in range(pop_size // 2):
+                    mutated = FFNetDecisionMaker.from_genotype(self.mutate(initial_genotype, rate=1.0), 
+                                                            layer_sizes=self.layer_sizes)
+                    self.population.append(mutated)
+            for _ in range(len(self.population), pop_size):
+                self.population.append(self.random_individual())
 
     def random_individual(self) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         weights = [
@@ -192,7 +199,12 @@ class GeneticAlgorithmController:
             # Create new generation
             new_pop = []
             while len(new_pop) < len(self.population):
-                p1, p2 = self.tournament_selection(self.population, fits)
+                if constants.NO_RANDOM:
+                    top_indices = sorted(range(len(fits)), key=lambda i: fits[i], reverse=True)[:2]
+                    p1 = self.population[top_indices[0]]
+                    p2 = self.population[top_indices[1]]
+                else:
+                    p1, p2 = self.tournament_selection(self.population, fits)
                 p1 = FFNetDecisionMaker.encode(weights=p1[0], biases=p1[1])
                 p2 = FFNetDecisionMaker.encode(weights=p2[0], biases=p2[1])
                 if random.random() < cx_rate:
