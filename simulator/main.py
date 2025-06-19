@@ -1,10 +1,15 @@
 import re
 import os
 
+from courses.course1 import GridCoverageCourseA
 from ml_stuff.ff_net_decision_maker import FFNetDecisionMaker
+from models.distance_sensors.sharp_ir import SharpIR
+from models.robots.two_wheel_TT import TwoWheelTT
 import simulator.constants as constants
 
 from controllers.genetic_algorithm_controller import GeneticAlgorithmController
+from controllers.optimized_controller import OptimizedGAController
+from smart_car.smart_car import SmartCar
 
 def parse_log_file(filename):
     fitness_line_pattern = re.compile(r'Fitness=([0-9.]+)\s+Genetics=genotype:\s*\[(.*)\]')
@@ -12,7 +17,7 @@ def parse_log_file(filename):
     layer_sizes_pattern = re.compile(r'Layer sizes:\s*\[([0-9,\s]+)\]')
     best_fitness = float('-inf')
     best_genotype = None
-    layer_sizes = None
+    layer_sizes = [3, 4, 2]
 
     with open(filename, "r") as f:
         for line in f:
@@ -35,15 +40,31 @@ def parse_log_file(filename):
     return layer_sizes, best_fitness, best_genotype
 
 def main():
-    layer_sizes, best_fitness, best_genotype = None, 0.0, None
+    layer_sizes, best_fitness, best_genotype = [3, 4, 2], 0.0, None
     if os.path.exists(constants.LOG_FILE_TO_SEED):
         layer_sizes, best_fitness, best_genotype = parse_log_file(constants.LOG_FILE_TO_SEED)
+
         print(f"Seeding with previous genotype that had fitness of: {best_fitness}")
 
-    ga = GeneticAlgorithmController(pop_size=40, 
-                                    n_generations=5, 
-                                    layer_sizes=layer_sizes, 
+    # Set up sensors, robot, decision maker, smart car, and course
+    course = GridCoverageCourseA(constants.WIDTH, constants.HEIGHT)
+    sensors = [SharpIR(-45, 0.3), SharpIR(0, 0.3), SharpIR(45, 0.3)]
+    robot_instance = TwoWheelTT(distance_sensors=sensors)
+    decision_maker = FFNetDecisionMaker(layer_sizes)
+    smart_car = SmartCar(robot_instance, decision_maker)
+    
+    ga = GeneticAlgorithmController(smart_car,
+                                    course,
+                                    pop_size=5, 
+                                    n_generations=2,
                                     initial_genotype=best_genotype)
+    
+    # ga = OptimizedGAController(smart_car,
+    #                                 course,
+    #                                 pop_size=5, 
+    #                                 n_generations=2,
+    #                                 initial_genotype=best_genotype)
+    
     if constants.DEMO_RUN:
         weights, biases = FFNetDecisionMaker.from_genotype(best_genotype, layer_sizes=ga.layer_sizes)
         ga.evaluate_individual(weights, biases,
@@ -56,9 +77,9 @@ def main():
         if constants.NO_RANDOM:
             cx_rate = 0.0
             mut_rate = 0.0
-        fitness_history = ga.run(constants.WIDTH, constants.HEIGHT,
-                cx_rate=cx_rate,
-                mut_rate=mut_rate)
+        fitness_history = ga.run(cx_rate=cx_rate,
+                                  mut_rate=mut_rate,
+                                  max_steps=5000)
         
         
         # plt.plot(fitness_history)

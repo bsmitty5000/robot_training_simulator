@@ -8,12 +8,10 @@ from models.robots.robot import RobotBase
 class TwoWheelTT(RobotBase):
     def __init__(
         self,
-        x: float,
-        y: float,
         distance_sensors: list[DistanceSensor] = None,
         robot_diameter_m: float = 0.1):
         
-        super().__init__(x, y, distance_sensors)
+        super().__init__(distance_sensors)
 
         longest_sensor_range_m = 0
         for sensor in distance_sensors:
@@ -24,8 +22,7 @@ class TwoWheelTT(RobotBase):
         # surface_size = (robot_footprint_radius_px * 2, robot_footprint_radius_px * 2)
         # self.original_image = pygame.Surface(surface_size, pygame.SRCALPHA)
         robot_radius_px = int((robot_diameter_m * constants.PIXELS_PER_METER) / 2)
-        position = core.Vector2(x, y)
-        self.circle = core.Circle(position, robot_radius_px)
+        self.circle = core.Circle(core.Vector2(self.position.x, self.position.y), robot_radius_px)
 
         # if constants.DEMO_RUN or not constants.HEADLESS_MODE:
         #     pygame.draw.circle(self.original_image, 
@@ -43,17 +40,19 @@ class TwoWheelTT(RobotBase):
         self.velocity = 0.0  # Current forward speed
         self.angular_velocity = 0.0  # Current rotation speed
 
-        self.max_acceleration = 100.0  # M/sec^2
-        self.max_angular_acceleration_deg = 180.0  # deg/sec^2
-
         self.left_pwm = 0.0
         self.right_pwm = 0.0
 
         self.angle_deg = -90.0  # Initial angle in degrees, facing right
+
         self.speed = 0.0
         self.rotation_speed = 0.0
-        self.max_speed = 50.0
+
+        self.max_acceleration = 100.0  # M/sec^2
+        self.max_angular_acceleration_deg = 180.0  # deg/sec^2
         self.max_rotation_speed = 90.0
+        self.max_speed = 50.0
+
     
     @property
     def control_input_size(self) -> int:
@@ -74,7 +73,27 @@ class TwoWheelTT(RobotBase):
     @property
     def  y_coordinate(self):
         return self.circle.center.y
+    
+    def reset(self,
+              x: float,
+              y: float,) -> None:
+        
+        self.circle.center.x = x
+        self.circle.center.y = y
+        self.position.x = x
+        self.position.y = y
 
+        self.velocity = 0.0  # Current forward speed
+        self.angular_velocity = 0.0  # Current rotation speed
+
+        self.left_pwm = 0.0
+        self.right_pwm = 0.0
+
+        self.angle_deg = -90.0  # Initial angle in degrees, facing right
+        
+        self.speed = 0.0
+        self.rotation_speed = 0.0
+    
     def move(self, dt: float, control_inputs: Sequence[float]) -> None:
 
         self.left_pwm = control_inputs[0] if len(control_inputs) > 0 else self.left_pwm

@@ -8,8 +8,8 @@ class SmartCar():
     def __init__(
         self,
         robot: Optional[RobotBase] = None,
-        decision_maker: Optional[DecisionBase] = None,  # Replace Any with your NN type if known
-    ):
+        decision_maker: Optional[DecisionBase] = None):
+        
         # Compose a RobotBase instance
         self.robot = robot
         self.decision_maker = decision_maker

@@ -14,12 +14,23 @@ class GridCoverageCourse(ABC):
         self.total_cells   = self.grid_width * self.grid_height
         # Subclasses should call make_course in their __init__ to set up obstacles
 
+    @property
+    @abstractmethod
+    def get_starting_point(self) -> core.Vector2:
+        pass
+
     @abstractmethod
     def make_course(
                     self,
                     thickness: int = 10,
                     min_distance_between_obstacles_m: int = 0.3) -> list[core.Rect]:
         """Subclasses must implement this to create and return a list of obstacles."""
+        pass
+
+    def reset(self) -> None:
+        """Resets internal completion trackers."""
+        self.coverage = [[False] * self.grid_height for _ in range(self.grid_width)]
+        self.visited_count = 0
         pass
 
     def mark_visited(self, x: float, y: float) -> None:

@@ -7,6 +7,10 @@ class GridCoverageCourseA(GridCoverageCourse):
     def __init__(self, width: int, height: int, cell_size: int = 10):
         super().__init__(width, height, cell_size)
 
+    @property
+    def get_starting_point(self) -> core.Vector2:
+        return core.Vector2(75, 75)
+
     def make_course(
                     self,
                     thickness: int = 10,

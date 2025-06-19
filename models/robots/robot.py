@@ -12,11 +12,9 @@ class RobotBase(ABC):
     distance_sensors: Optional[Sequence[DistanceSensor]]
 
     def __init__(self, 
-                 x: float, 
-                 y: float, 
                  distance_sensors: Optional[Sequence[DistanceSensor]]=None) -> None:
         super().__init__()
-        self.position = core.Vector2(x, y)
+        self.position = core.Vector2(0, 0)
         self.angle_deg = 0.0
         self.velocity = 0.0
         self.angular_velocity = 0.0
@@ -50,6 +48,13 @@ class RobotBase(ABC):
     @abstractmethod
     def y_coordinate(self):
         """Current Y position."""
+        pass
+
+    @abstractmethod
+    def reset(self,
+              x: float,
+              y: float,) -> None:
+        """Reset all internals and set position."""
         pass
 
     @abstractmethod
