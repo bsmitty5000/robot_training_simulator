@@ -1,5 +1,6 @@
 import math
-from numba import njit, float32
+from numba import njit
+import numpy as np
 
 MAX_SPEED = 50.0            # px/s
 MAX_ROT_SPEED = 90.0        # deg/s
@@ -8,13 +9,13 @@ MAX_ROT_ACC = 180.0         # deg/s²
 
 @njit(fastmath=True, cache=True)
 def move_step(
-    px: float32, py: float32,         # position at t
-    angle_deg: float32,               # heading (CW screen-coords)
-    velocity: float32,                # linear speed  (px/s or m/s)
-    ang_vel: float32,                 # angular speed (deg/s, CW+)
-    pwmL: float32, pwmR: float32,     # last PWM commands  −255 … +255
-    cmdL: float32, cmdR: float32,     # new PWM commands  (network outputs *255)
-    dt: float32
+    px: np.float32, py: np.float32,         # position at t
+    angle_deg: np.float32,                  # heading (CW screen-coords)
+    velocity: np.float32,                   # linear speed  (px/s or m/s)
+    ang_vel: np.float32,                    # angular speed (deg/s, CW+)
+    pwmL: np.float32, pwmR: np.float32,     # last PWM commands  −255 … +255
+    cmdL: np.float32, cmdR: np.float32,     # new PWM commands  (network outputs *255)
+    dt: np.float32
 ):
     """Return updated state tuple (px,py,angle_deg,velocity,ang_vel,pwmL,pwmR)."""
 

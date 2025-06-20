@@ -1,9 +1,11 @@
-from numba import njit, float32
+from numba import njit
 import math
 
+import numpy as np
+
 @njit(fastmath=True, cache=True)
-def fwd(chrom: float32[:],    # len 26 (chromosome: weights + biases)
-        s:       float32[:] ):  # len 3  (sensor readings)
+def fwd(chrom:  np.float32[:],    # len 26 (chromosome: weights + biases)
+        s:      np.float32[:] ):  # len 3  (sensor readings)
 
     s0, s1, s2 = s[0], s[1], s[2]
     weights = chrom[:20]         # first 20 = all weights

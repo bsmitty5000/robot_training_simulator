@@ -20,19 +20,19 @@ from pathlib import Path
 class GAOptimizer:
     # ───── constructor ────────────────────────────────────────────────
     def __init__(self,
-                 population: int        = 256,
-                 chrom_len:  int        = 26,
-                 elite_fraction: float  = 0.05,
-                 tournament_k:  int     = 3,
-                 mutation_sigma: float  = 0.15,
-                 sigma_decay:   float   = 0.99,
-                 seed_chrom:    str|None = None,
-                 population_file:str|None = None,
-                 rng_seed:      int|None = None):
+                 population:        np.int32        = 256,
+                 chrom_len:         np.int32        = 26,
+                 elite_fraction:    np.float32  = 0.05,
+                 tournament_k:      np.int32     = 3,
+                 mutation_sigma:    np.float32  = 0.15,
+                 sigma_decay:       np.float32   = 0.99,
+                 seed_chrom:        str|None = None,
+                 population_file:   str|None = None,
+                 rng_seed:          np.int32|None = None):
         
         self.pop_size       = population
         self.chrom_len      = chrom_len
-        self.elite_n        = max(1, int(population * elite_fraction))
+        self.elite_n        = max(1, np.int32(population * elite_fraction))
         self.k              = tournament_k
         self.sigma          = mutation_sigma
         self.sigma_decay    = sigma_decay

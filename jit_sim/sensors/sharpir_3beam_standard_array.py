@@ -8,10 +8,10 @@ SENSOR_RANGE = 150.0  # 500px/m * 0.3m range
 
 @njit(fastmath=True, cache=True)
 def sense(
-    px: float32, py: float32,         # robot position at t
-    angle_deg: float32,               # robot heading (CW screen-coords)
-    rects,  # (8,4) float32           # obstacles as [left, right, top, bottom] rectangles
-    robot_r: float32                 # robot radius (px)
+    px: np.float32, py: np.float32,     # robot position at t
+    angle_deg: np.float32,              # robot heading (CW screen-coords)
+    rects,                              # (8,4) float32 # obstacles as [left, right, top, bottom] rectangles
+    robot_r: np.float32                 # robot radius (px)
     ):
 
     readings = np.empty(3, np.float32)

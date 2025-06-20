@@ -1,7 +1,7 @@
 {
   "steps_per_episode": 5000,
   "dt": 0.05,
-  "generations": 500,
+  "generations": 5,
 
   "controller": {
     "module": "jit_sim.controllers.nn_3x4x2",

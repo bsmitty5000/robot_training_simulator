@@ -1,5 +1,5 @@
 import math
-from numba import njit, prange, float32, int32
+from numba import njit, prange
 import numpy as np
 
 JITTER_PENALTY = 0.1  # penalty for PWM jitter
@@ -9,19 +9,19 @@ STALE_LIMIT     = 40       # steps (~2 s at 20 Hz)
 
 @njit(parallel=True, fastmath=True, cache=True)
 # @njit(fastmath=True, cache=True)
-def run_generation(population: float32[:, :],      # (P, N) array of P chromosomes (N floats each) dependent on controller_fn
-                   rects:       float32[:, :],      # (N, 4) obstacles
+def run_generation(population: np.float32[:, :],      # (P, N) array of P chromosomes (N floats each) dependent on controller_fn
+                   rects:       np.float32[:, :],      # (N, 4) obstacles
                    controller_fn,                  # callable(chrom, sensors) -> (pwmL,pwmR)
                    sensor_fn,                      # callable(px,py,hd, rects,r) -> 3-array
-                   sensor_range: float32,         # sensor range (px)
+                   sensor_range: np.float32,         # sensor range (px)
                    move_fn,                        # callable(state, cmdL, cmdR, dt) -> new state
-                   steps:       int32,
-                   dt:          float32,
-                   robot_r:     float32,
-                   world_width: float32,
-                   world_height: float32,
-                   starting_x: float32,
-                   starting_y: float32) -> float32[:]:
+                   steps:       np.int32,
+                   dt:          np.float32,
+                   robot_r:     np.float32,
+                   world_width: np.float32,
+                   world_height: np.float32,
+                   starting_x: np.float32,
+                   starting_y: np.float32) -> np.float32[:]:
 
     pop_size        = population.shape[0]
     fitness         = np.zeros(pop_size, dtype=np.float32)
