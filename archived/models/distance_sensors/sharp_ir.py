@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from sim import core
+from visualization import core
 from .distance_sensor import DistanceSensor
 
 class SharpIR(DistanceSensor):

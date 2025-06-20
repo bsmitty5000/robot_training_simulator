@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Sequence, Optional
-import sim.core as core
+import visualization.core as core
 
 from simulator import constants
 

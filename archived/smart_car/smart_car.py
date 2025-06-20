@@ -1,4 +1,4 @@
-from sim import core
+from visualization import core
 from typing import Sequence, Optional, Any
 from ml_stuff.decision_base import DecisionBase
 from models.robots.robot import RobotBase

@@ -1,6 +1,6 @@
 
 from collections.abc import Sequence
-from sim import core
+from visualization import core
 import simulator.constants as constants
 from models.distance_sensors.distance_sensor import DistanceSensor
 from models.robots.robot import RobotBase

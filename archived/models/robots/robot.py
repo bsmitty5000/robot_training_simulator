@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Sequence, Optional
 
 from models.distance_sensors.distance_sensor import DistanceSensor
-from sim import core
+from visualization import core
 
 class RobotBase(ABC):
     position: core.Vector2

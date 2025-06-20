@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from sim import core
+from visualization import core
 
 class GridCoverageCourse(ABC):
     def __init__(self, width: int, height: int, cell_size: int = 10):

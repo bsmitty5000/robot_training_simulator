@@ -3,7 +3,7 @@ import numpy as np
 import simulator.constants as constants
 from typing import List, Tuple
 
-from sim import core
+from visualization import core
 from ml_stuff.ff_net_decision_maker import FFNetDecisionMaker
 from smart_car.smart_car import SmartCar
 from models.robots.two_wheel_TT import TwoWheelTT
