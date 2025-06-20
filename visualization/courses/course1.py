@@ -1,7 +1,7 @@
 # Example: courses/boundary_course.py
 from courses.grid_coverage_course import GridCoverageCourse
 from simulator import constants
-from sim import core
+from visualization import core
 
 class GridCoverageCourseA(GridCoverageCourse):
     def __init__(self, width: int, height: int, cell_size: int = 10):

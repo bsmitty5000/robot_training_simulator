@@ -2,21 +2,29 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Run simulation.main as module",
+            "name": "JIT Sim",
             "type": "debugpy",
             "request": "launch",
-            "module": "simulator.main",
+            "module": "jit_sim.main",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
         },
         {
-            "name": "Python: Profile simulator.main",
+            "name": "Visualizer",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "visualization.main",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Profile JIT Sim",
             "type": "debugpy",                  // same type as your current config
             "request": "launch",
             "module": "cProfile",               // ← run as “python -m cProfile”
             "args": [
                 "-o", "${workspaceFolder}/sim.prof",  // write stats to sim.prof
-                "${workspaceFolder}/simulator/main.py"                      // then invoke your module
+                "${workspaceFolder}/jit_sim/main.py"                      // then invoke your module
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
