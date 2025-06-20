@@ -1,29 +1,28 @@
-import sys
+import numpy as np
 import pygame
-from courses.grid_coverage_course import GridCoverageCourse
-from ml_stuff.decision_base import DecisionBase
-from models.obstacle import Obstacle
-from models.robots.robot import RobotBase
-from smart_car.smart_car import SmartCar
 
-def show_debug_info(screen, 
-                    sensor_readings:        float32[:, :],
-                    robot_state:            float32[:, :],
-                    controller_outputs:     float32[:, :],
-                    robot_inputs:           float32[:]):
-    
+def show_debug_info(screen,
+                    sensor_readings:    np.ndarray,   # 3×
+                    robot_state:        np.ndarray,   # [x, y, hd_deg]
+                    controller_outputs: np.ndarray,   # 2×  (-1..1)
+                    robot_inputs:       np.ndarray):  # 2×  (PWM L,R)
+
     font = pygame.font.SysFont("consolas", 12)
-    sensor_text = "Sensors: " + ", ".join(
-        f"{s:5.2f}" if s is not None else "N/A"
-        for s in sensor_readings)
 
-    debug_text = (
-        f"Controller outputs: {', '.join(f'{o:8.4}' for o in controller_outputs)} | "
-        f"Robot Inputs: {', '.join(f'{o:8.4}' for o in robot_inputs)} | "
-        f"Robot State: {', '.join(f'{o:8.4}' for o in robot_state)} | "
-    )
+    # ---- fixed-width formatting ------------------------------------
+    sens_text = "Sensors: " + ", ".join(f"{s:6.1f}" for s in sensor_readings)
+    ctrl_text = "Ctrl: "    + ", ".join(f"{o:+7.3f}" for o in controller_outputs)
+    pwm_text  = "PWM: "     + ", ".join(f"{i:+4.0f}"  for i in robot_inputs)   # -255..255
+    state_text= "Pos/Hdg: " + ", ".join(f"{v:7.1f}"   for v in robot_state)    # x y hd
 
-    text_surface = font.render(sensor_text, True, (255, 255, 255))
-    debug_surface = font.render(debug_text, True, (255, 255, 0))
-    screen.blit(text_surface, (10, 10))
-    screen.blit(debug_surface, (10, 30))
+    line1 = sens_text
+    line2 = f"{ctrl_text} | {pwm_text} | {state_text}"
+
+    # ---- erase old text area (optional but avoids ghosting) ---------
+    bg_rect = pygame.Rect(8, 8, 900, 32)      # big enough for both lines
+    pygame.draw.rect(screen, (0, 0, 0), bg_rect)
+
+    # ---- render & blit ---------------------------------------------
+    screen.blit(font.render(line1, True, (255, 255, 255)), (10, 10))
+    screen.blit(font.render(line2, True, (255, 255,   0)), (10, 24))
+

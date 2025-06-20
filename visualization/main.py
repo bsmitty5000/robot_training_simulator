@@ -1,13 +1,14 @@
+
+import pygame
 import math
 import json, os, re, sys
 from pathlib import Path
 
 import numpy as np
-import pygame
 
-from jit_sim.main         import load_spec, load_map
-from jit_sim.core_kernels import circle_rect_collides
-from .helpers             import show_debug_info   # your existing HUD
+from jit_sim.helpers        import load_spec, load_map
+from jit_sim.core_kernels   import circle_rect_collides
+from .helpers               import show_debug_info   # your existing HUD
 
 PIX_PER_M = 500.0   # pixels per meter  (world→screen scale)
 
@@ -20,7 +21,7 @@ def draw_course(screen, rects, color=(50, 50, 50)):
     """rects : (N,4) [l,r,t,b] world px."""
     for l, r, t, b in rects:
         w, h = r - l, b - t
-        pygame.draw.rect(screen, color, pygame.Rect(l, t, w, h))
+        pygame.draw.rect(screen, color, pygame.Rect(int(l), int(t), int(w), int(h)))
 
 def draw_robot(screen, x, y, r, hd_deg):
     pygame.draw.circle(screen, (0, 120, 255), world_to_screen(x, y), int(r), 2)
