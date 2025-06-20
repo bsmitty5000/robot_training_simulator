@@ -9,8 +9,8 @@ STALE_LIMIT     = 40       # steps (~2 s at 20 Hz)
 
 @njit(parallel=True, fastmath=True, cache=True)
 # @njit(fastmath=True, cache=True)
-def run_generation(population: np.float32[:, :],      # (P, N) array of P chromosomes (N floats each) dependent on controller_fn
-                   rects:       np.float32[:, :],      # (N, 4) obstacles
+def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes (N floats each) dependent on controller_fn
+                   rects:       np.ndarray,      # (N, 4) obstacles
                    controller_fn,                  # callable(chrom, sensors) -> (pwmL,pwmR)
                    sensor_fn,                      # callable(px,py,hd, rects,r) -> 3-array
                    sensor_range: np.float32,         # sensor range (px)
@@ -21,7 +21,7 @@ def run_generation(population: np.float32[:, :],      # (P, N) array of P chromo
                    world_width: np.float32,
                    world_height: np.float32,
                    starting_x: np.float32,
-                   starting_y: np.float32) -> np.float32[:]:
+                   starting_y: np.float32) -> np.ndarray:
 
     pop_size        = population.shape[0]
     fitness         = np.zeros(pop_size, dtype=np.float32)
