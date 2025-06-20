@@ -1,0 +1,20 @@
+This is made with 500 generations of 1024 individuals.
+
+Many tweaks to the fitness rewards:
+  * jitter penalty is stil 0.1 but i was looking at the actual
+    value's and they're in the 10^-5 range so this is never going
+    to make much difference unless the penalty multiplier is huge
+  * clearance reward is now calculated as by taking the average
+    of all the sensor readings, normalizing by the max range,
+    and multiplying by the reward multiplier
+  * new cell reward is now 50 for each new cell. i figure it's so
+    novel to find a new cell since cells are as large as the
+    robot compared to keep alive reward
+  * keep alive reward is halved, so each time step contributes
+    1/2 a point
+  * added a new timeout penalty that just wipes away any keep
+    alive points that were accumulated while stalled
+
+when i visualized this one it almost made it all the way!
+somehow it got confused on the last left turn, i think b/c
+that one is different since the clearance is smaller there
