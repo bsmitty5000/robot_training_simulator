@@ -1,79 +1,154 @@
-import re
-import os
-import time
+import math
+import json, os, re, sys
+from pathlib import Path
 
-from ml_stuff.ff_net_decision_maker import FFNetDecisionMaker
-import simulator.constants as constants
+import numpy as np
+import pygame
 
-from controllers.genetic_algorithm_controller import GeneticAlgorithmController
+from jit_sim.main         import load_spec, load_map
+from jit_sim.core_kernels import circle_rect_collides
+from .helpers             import show_debug_info   # your existing HUD
 
-def parse_log_file(filename):
-    fitness_line_pattern = re.compile(r'Fitness=([0-9.]+)\s+Genetics=genotype:\s*\[(.*)\]')
-    float_pattern = re.compile(r'np\.float64\(([-+]?\d*\.\d+|\d+)\)')
-    layer_sizes_pattern = re.compile(r'Layer sizes:\s*\[([0-9,\s]+)\]')
-    best_fitness = float('-inf')
-    best_genotype = None
-    layer_sizes = None
+PIX_PER_M = 500.0   # pixels per meter  (world→screen scale)
 
-    with open(filename, "r") as f:
-        for line in f:
-            match = layer_sizes_pattern.search(line)
-            if match:
-                layer_sizes_str = match.group(1)
-                layer_sizes = [int(x) for x in layer_sizes_str.split(',')]
+# ───────────────────────────────────────── helpers ────────────────────
+def world_to_screen(wx, wy):
+    """Convert world coords (y-down) to screen ints (pygame expects ints)."""
+    return int(wx), int(wy)            # 1-to-1 mapping; flip if needed
 
-            # Match lines with Fitness and Genetics
-            match = fitness_line_pattern.search(line)
-            if match:
-                fitness = float(match.group(1))
-                genotype_str = match.group(2)
-                # Extract all float values (ignore np.float64 wrappers)
-                floats = [float(x) for x in float_pattern.findall(genotype_str)]
-                if fitness > best_fitness:
-                    best_fitness = fitness
-                    best_genotype = floats
+def draw_course(screen, rects, color=(50, 50, 50)):
+    """rects : (N,4) [l,r,t,b] world px."""
+    for l, r, t, b in rects:
+        w, h = r - l, b - t
+        pygame.draw.rect(screen, color, pygame.Rect(l, t, w, h))
+
+def draw_robot(screen, x, y, r, hd_deg):
+    pygame.draw.circle(screen, (0, 120, 255), world_to_screen(x, y), int(r), 2)
+    # heading tick
+    hd_rad = np.radians(hd_deg)
+    end = (x + r * np.cos(hd_rad),
+           y - r * np.sin(hd_rad))     # minus because screen-y down
+    pygame.draw.line(screen, (0, 120, 255),
+                     world_to_screen(x, y), world_to_screen(*end), 2)
+
+def draw_sensors(screen, x, y, hd_deg,
+                 sensor_vals,          # length-3 array (px)
+                 max_range,            # scalar px
+                 robot_r):
+    """Draw left, center, right IR beams."""
+    offsets = np.array([-45.0, 0.0, 45.0], dtype=np.float32)
+
+    for idx, dist in enumerate(sensor_vals):
+        head = np.radians(hd_deg + offsets[idx])
+        # sensor origin = circle edge
+        sx = x + math.cos(head) * robot_r
+        sy = y - math.sin(head) * robot_r
+
+        # endpoint — use max_range if no hit (for ghost beam)
+        eff_dist = dist
+        color    = (255, 80, 80) if dist < max_range else (140, 140, 140)
+
+        ex = sx + math.cos(head) * eff_dist
+        ey = sy - math.sin(head) * eff_dist
+
+        pygame.draw.line(screen, color,
+                         world_to_screen(sx, sy),
+                         world_to_screen(ex, ey), 2)
+
+
+# ───────────────────────────────────────── main loop ───────────────────
+def run_simulation():
+    pygame.init()
+
+    # ── config file path ──────────────────────────────────────────────
+    cfg_file = Path(sys.argv[1]) if len(sys.argv) > 1 else \
+               Path("jit_sim/configs/tt_sharpir_feedfwNN_vanillaGA.json")
+    cfg = json.load(cfg_file.open())
+
+    # sim params
+    steps_per_episode = cfg.get("steps_per_episode", 5000)
+    dt                = cfg.get("dt", 0.05)
+
+    # plug-ins
+    controller_fn, ctrl_kwargs = load_spec(cfg["controller"])
+    sensor_fn,     sens_kwargs = load_spec(cfg["sensor"])
+    move_fn,       robot_kwargs= load_spec(cfg["robot"])
+
+    # map + size
+    rects, map_kwargs = load_map(cfg["map"])
+    world_w = map_kwargs.get("width_px", 1280.0)
+    world_h = map_kwargs.get("height_px", 720.0)
+    start_x = map_kwargs.get("starting_x", 75.0)
+    start_y = map_kwargs.get("starting_y", 75.0)  # fixed typo
+
+    # robot constants
+    robot_r = robot_kwargs["wheel_radius_m"] * PIX_PER_M
+
+    # best chromosome lookup (same logic you had) ----------------------
+    best_chrom = None
+    out_dir = Path("saved_chromosomes")
+    best_fit = -np.inf
+    pat = re.compile(r"seed_chromosome_gen\d+_(\d+)fitness\.npy")
+    for f in out_dir.glob("seed_chromosome_gen*_*.npy"):
+        m = pat.match(f.name)
+        if m and int(m.group(1)) > best_fit:
+            best_fit, best_chrom = int(m.group(1)), f
+    if best_chrom is None:
+        raise FileNotFoundError("No chromosome file found!")
+    chromosome = np.load(best_chrom).astype(np.float32)
+
+    # state vars
+    x, y            = start_x, start_y
+    heading_deg     = -90.0
+    velocity        = 0.0
+    ang_vel         = 0.0
+    pwmL = pwmR     = 0.0
+
+    running = True
+    step    = 0
+    sensor_max = sens_kwargs.get("max_range", 150.0)
     
-    return layer_sizes, best_fitness, best_genotype
+    screen = pygame.display.set_mode((world_w, world_h))
+    clock  = pygame.time.Clock()
 
-def main():
-    layer_sizes, best_fitness, best_genotype = None, 0.0, None
-    if os.path.exists(constants.LOG_FILE_TO_SEED):
-        layer_sizes, best_fitness, best_genotype = parse_log_file(constants.LOG_FILE_TO_SEED)
-        print(f"Seeding with previous genotype that had fitness of: {best_fitness}")
+    while running and step < steps_per_episode:
+        # ---------------- Pygame events ------------------------------
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+                running = False
 
-    ga = GeneticAlgorithmController(pop_size=40, 
-                                    n_generations=5, 
-                                    layer_sizes=layer_sizes, 
-                                    initial_genotype=best_genotype)
-    if constants.DEMO_RUN:
-        weights, biases = FFNetDecisionMaker.from_genotype(best_genotype, layer_sizes=ga.layer_sizes)
-        ga.evaluate_individual(weights, biases,
-                                constants.WIDTH, constants.HEIGHT, 
-                                individual_idx=0, generation=0)
-    else:
-        #ga.evolve(screen, clock, constants.WIDTH, constants.HEIGHT)
-        cx_rate = 0.7
-        mut_rate = 0.03
-        if constants.NO_RANDOM:
-            cx_rate = 0.0
-            mut_rate = 0.0
-            
-        start = time.time()
+        # ---------------- JIT pipeline -------------------------------
+        sensors = sensor_fn(x, y, heading_deg, rects, robot_r)
+        cmdL_raw, cmdR_raw = controller_fn(chromosome, sensors)
+        cmdL = cmdL_raw * 255.0
+        cmdR = cmdR_raw * 255.0
 
-        fitness_history = ga.run(constants.WIDTH, constants.HEIGHT,
-                cx_rate=cx_rate,
-                mut_rate=mut_rate)
-        
-        end = time.time()
-        print(f"GA run took {end - start:.2f} seconds")
-        
-        
-        # plt.plot(fitness_history)
-        # plt.title("Best Fitness over Generations")
-        # plt.xlabel("Generation")
-        # plt.ylabel("Fitness")
-        # plt.ioff()
-        # plt.show()
-    
+        x, y, heading_deg, velocity, ang_vel, pwmL, pwmR = move_fn(
+            x, y, heading_deg, velocity, ang_vel, pwmL, pwmR, cmdL, cmdR, dt)
+
+        if circle_rect_collides(x, y, robot_r, rects):
+            print("Crash!")
+            break
+
+        # ---------------- drawing ------------------------------------
+        screen.fill((30, 30, 30))
+        draw_course(screen, rects)
+        draw_robot(screen, x, y, robot_r, heading_deg)
+        draw_sensors(screen, x, y, heading_deg, sensors, sensor_max, robot_r)
+
+        show_debug_info(screen,
+                        sensors,
+                        np.array([x, y, heading_deg]),
+                        np.array([cmdL_raw, cmdR_raw]),
+                        np.array([pwmL, pwmR]))
+
+        pygame.display.flip()
+        clock.tick(1 / dt)
+        step += 1
+
+    pygame.quit()
+
 if __name__ == "__main__":
-    main()
+    run_simulation()
