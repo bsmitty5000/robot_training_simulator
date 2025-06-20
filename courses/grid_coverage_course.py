@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from models.obstacle import Obstacle
+from sim import core
 
 class GridCoverageCourse(ABC):
     def __init__(self, width: int, height: int, cell_size: int = 10):
@@ -18,7 +18,7 @@ class GridCoverageCourse(ABC):
     def make_course(
                     self,
                     thickness: int = 10,
-                    min_distance_between_obstacles_m: int = 0.3) -> list[Obstacle]:
+                    min_distance_between_obstacles_m: int = 0.3) -> list[core.Rect]:
         """Subclasses must implement this to create and return a list of obstacles."""
         pass
 

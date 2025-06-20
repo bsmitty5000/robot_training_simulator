@@ -1,13 +1,10 @@
 import re
-import sys
+import os
+import time
 
-from matplotlib import pyplot as plt
 from ml_stuff.ff_net_decision_maker import FFNetDecisionMaker
 import simulator.constants as constants
-if not constants.DEMO_RUN and constants.HEADLESS_MODE:
-    import os
-    os.environ["SDL_VIDEODRIVER"] = "dummy"
-import pygame
+
 from controllers.genetic_algorithm_controller import GeneticAlgorithmController
 
 def parse_log_file(filename):
@@ -39,9 +36,6 @@ def parse_log_file(filename):
     return layer_sizes, best_fitness, best_genotype
 
 def main():
-    pygame.init()
-    screen = pygame.display.set_mode((constants.WIDTH, constants.HEIGHT))
-    clock = pygame.time.Clock()
     layer_sizes, best_fitness, best_genotype = None, 0.0, None
     if os.path.exists(constants.LOG_FILE_TO_SEED):
         layer_sizes, best_fitness, best_genotype = parse_log_file(constants.LOG_FILE_TO_SEED)
@@ -53,16 +47,25 @@ def main():
                                     initial_genotype=best_genotype)
     if constants.DEMO_RUN:
         weights, biases = FFNetDecisionMaker.from_genotype(best_genotype, layer_sizes=ga.layer_sizes)
-        ga.evaluate_individual(weights, biases, 
-                                screen, clock, 
+        ga.evaluate_individual(weights, biases,
                                 constants.WIDTH, constants.HEIGHT, 
                                 individual_idx=0, generation=0)
     else:
         #ga.evolve(screen, clock, constants.WIDTH, constants.HEIGHT)
-        fitness_history = ga.run(screen, clock, 
-            constants.WIDTH, constants.HEIGHT,
-                cx_rate=0.7,
-                mut_rate=0.03)
+        cx_rate = 0.7
+        mut_rate = 0.03
+        if constants.NO_RANDOM:
+            cx_rate = 0.0
+            mut_rate = 0.0
+            
+        start = time.time()
+
+        fitness_history = ga.run(constants.WIDTH, constants.HEIGHT,
+                cx_rate=cx_rate,
+                mut_rate=mut_rate)
+        
+        end = time.time()
+        print(f"GA run took {end - start:.2f} seconds")
         
         
         # plt.plot(fitness_history)
@@ -72,8 +75,5 @@ def main():
         # plt.ioff()
         # plt.show()
     
-    pygame.quit()
-    sys.exit()
-
 if __name__ == "__main__":
     main()
