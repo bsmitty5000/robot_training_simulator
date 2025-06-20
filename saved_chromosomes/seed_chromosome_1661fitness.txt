@@ -1,0 +1,10 @@
+this chromosome is the best of 5 generations of 256 individuals
+it exhibits incredible obstacle avoidance like all of the best
+now, but it's able to navigate turns much better than the current
+higher fitness chromosomes. the only issue is on left turns it seems
+to miss any new openings and instead completely turns around. then
+when it gets to the other end, which is now another left turn, it
+does the same thing.
+
+i think something is off with how i'm
+currently rewarding/punishing behavior.
