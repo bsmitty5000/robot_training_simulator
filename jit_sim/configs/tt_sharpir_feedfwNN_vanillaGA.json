@@ -1,30 +1,37 @@
 {
-  "steps_per_episode": 500,
+  "steps_per_episode": 5000,
   "dt": 0.05,
+  "generations": 500,
 
   "controller": {
-    "module": "controllers.nn_3x4x2",
+    "module": "jit_sim.controllers.nn_3x4x2",
     "func":   "fwd",
     "weights_file": "seed_weights.npy"
   },
   "robot": {
-    "module": "robots.tt_2wheel",
-    "func":   "move_step"
+    "module": "jit_sim.robots.tt_2wheel",
+    "func":   "move_step",
+    "wheel_radius_m": 0.05
   },
 
   "sensor": {
-    "module": "sensors.sharp_3beam_standard_array",
-    "func":   "detect",
+    "module": "jit_sim.sensors.sharpir_3beam_standard_array",
+    "func":   "sense",
     "max_range_m": 0.3
   },
   "optimizer": {
-    "module": "optimisers.ga",
+    "module": "jit_sim.optimisers.ga",
     "class":  "GAOptimizer",
-    "population": 256,
+    "population": 1024,
     "mutation_sigma": 0.15,
-    "elite_fraction": 0.05
+    "elite_fraction": 0.05,
+    "seed_chrom": ""
   },
   "map": {
-    "module": "maps.simple_horizontal_rows"
+    "module": "jit_sim.maps.simple_horizontal_rows",
+    "height_px": 720,
+    "width_px": 1280,
+    "starting_x": 75,
+    "staring_y": 75
   }
 }

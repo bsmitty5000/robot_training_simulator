@@ -1,6 +1,11 @@
 import math
 from numba import njit, float32
 
+MAX_SPEED = 50.0            # px/s
+MAX_ROT_SPEED = 90.0        # deg/s
+MAX_ACC = 100.0             # px/s²
+MAX_ROT_ACC = 180.0         # deg/s²
+
 @njit(fastmath=True, cache=True)
 def move_step(
     px: float32, py: float32,         # position at t
@@ -9,11 +14,7 @@ def move_step(
     ang_vel: float32,                 # angular speed (deg/s, CW+)
     pwmL: float32, pwmR: float32,     # last PWM commands  −255 … +255
     cmdL: float32, cmdR: float32,     # new PWM commands  (network outputs *255)
-    dt: float32,
-    max_speed: float32,               # px/s
-    max_rot_speed: float32,           # deg/s
-    max_acc: float32,                 # px/s²
-    max_rot_acc: float32              # deg/s²
+    dt: float32
 ):
     """Return updated state tuple (px,py,angle_deg,velocity,ang_vel,pwmL,pwmR)."""
 
@@ -25,19 +26,19 @@ def move_step(
     avg_pwm  = (pwmL + pwmR) * 0.5
     diff_pwm = pwmL - pwmR
 
-    tgt_speed = max_speed      * (avg_pwm  / 255.0)      # px/s
-    tgt_rot   = max_rot_speed  * (diff_pwm / 255.0)      # deg/s
+    tgt_speed = MAX_SPEED      * (avg_pwm  / 255.0)      # px/s
+    tgt_rot   = MAX_ROT_SPEED  * (diff_pwm / 255.0)      # deg/s
 
     # 2) throttle linear acceleration
     dv  = tgt_speed - velocity
-    max_dv = max_acc * dt
+    max_dv = MAX_ACC * dt
     if   dv >  max_dv: dv =  max_dv
     elif dv < -max_dv: dv = -max_dv
     velocity += dv
 
     #    throttle angular acceleration
     dw  = tgt_rot - ang_vel
-    max_dw = max_rot_acc * dt
+    max_dw = MAX_ROT_ACC * dt
     if   dw >  max_dw: dw =  max_dw
     elif dw < -max_dw: dw = -max_dw
     ang_vel += dw

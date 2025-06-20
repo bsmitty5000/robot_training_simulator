@@ -15,6 +15,7 @@ Usage (see main.py):
 """
 from __future__ import annotations
 import numpy as np
+from pathlib import Path
 
 class GAOptimizer:
     # ───── constructor ────────────────────────────────────────────────
@@ -25,7 +26,10 @@ class GAOptimizer:
                  tournament_k:  int     = 3,
                  mutation_sigma: float  = 0.15,
                  sigma_decay:   float   = 0.99,
+                 seed_chrom:    str|None = None,
+                 population_file:str|None = None,
                  rng_seed:      int|None = None):
+        
         self.pop_size       = population
         self.chrom_len      = chrom_len
         self.elite_n        = max(1, int(population * elite_fraction))
@@ -34,12 +38,29 @@ class GAOptimizer:
         self.sigma_decay    = sigma_decay
         self.rng            = np.random.default_rng(rng_seed)
 
+        self._seed_chrom_path   = Path(seed_chrom)     if seed_chrom   else None
+        self._population_path   = Path(population_file) if population_file else None
+
     # ───── population bootstrap ───────────────────────────────────────
     def initial_population(self) -> np.ndarray:
-        """
-        Returns (pop_size, chrom_len) float32 array.
-        Weights initialised N(0, 0.3); biases zero.
-        """
+        # 1) Resume from saved population file
+        if self._population_path and self._population_path.exists():
+            pop = np.load(self._population_path).astype(np.float32)
+            assert pop.shape == (self.pop_size, self.chrom_len), \
+                   "population_file shape mismatch"
+            return pop
+
+        # 2) Seed around a known chromosome
+        if self._seed_chrom_path and self._seed_chrom_path.exists():
+            seed = np.load(self._seed_chrom_path).astype(np.float32)
+            assert seed.size == self.chrom_len, "seed_chrom length mismatch"
+
+            noise = self.rng.normal(0.0, self.sigma,
+                                    size=(self.pop_size, self.chrom_len)
+                                    ).astype(np.float32)
+            return (seed + noise)
+
+        # 3) Pure random initialisation (default)
         W = self.rng.normal(0.0, 0.3, size=(self.pop_size, 20)).astype(np.float32)
         b = np.zeros((self.pop_size, 6), dtype=np.float32)
         return np.concatenate([W, b], axis=1)

@@ -2,131 +2,72 @@ import math
 from numba import njit, prange, float32, int32
 import numpy as np
 
-# @njit(parallel=True, fastmath=True, cache=True)
-@njit(fastmath=True, cache=True)
-def run_generation( weights, biases, pop_size,
-                    steps, dt,
-                    rects,  # (8,4) float32
-                    sensor_dirs,  # (3,2) unit vecs
-                    sensor_range,
-                    robot_radius,
-                    MAX_SPEED, MAX_ROT_SPEED,
-                    MAX_ACC,  MAX_ROT_ACC):
-
-    fitness = np.zeros(pop_size, dtype=np.float32)
-
-    # per-robot state vectors
-    x  = np.full(pop_size, 75, dtype=np.float32)
-    y  = np.full(pop_size, 75, dtype=np.float32)
-    vel = np.zeros(pop_size, dtype=np.float32)
-    ang_v = np.zeros(pop_size, dtype=np.float32)
-    pwmL = np.zeros(pop_size, dtype=np.float32)
-    pwmR = np.zeros(pop_size, dtype=np.float32)
-    hd = np.zeros(pop_size, dtype=np.float32)   # heading (rad)
-
-    for step in range(steps):
-        # -------- sensor pass (vectorised over pop & 3 sensors) ----------
-        for p in prange(pop_size):              # outer loop parallelised
-            readings = np.empty(3, np.float32)
-            for s in range(3):
-                dx =  math.cos(hd[p]) * sensor_dirs[s,0] \
-                    - math.sin(hd[p]) * sensor_dirs[s,1]
-                dy =  math.sin(hd[p]) * sensor_dirs[s,0] \
-                    + math.cos(hd[p]) * sensor_dirs[s,1]
-                readings[s] = ray_aabb_min_dist(
-                                x[p], y[p], dx, dy,
-                                rects, sensor_range)
-
-            # -------- tiny neural net (3×4×2) fully in njit ------------
-            # inlining removes Python call overhead entirely
-            h0 = math.tanh(readings[0]*weights[p,0] +
-                        readings[1]*weights[p,1] +
-                        readings[2]*weights[p,2] + biases[p,0])
-            h1 = math.tanh(readings[0]*weights[p,3] +
-                        readings[1]*weights[p,4] +
-                        readings[2]*weights[p,5] + biases[p,1])
-            h2 = math.tanh(readings[0]*weights[p,6] +
-                        readings[1]*weights[p,7] +
-                        readings[2]*weights[p,8] + biases[p,2])
-            h3 = math.tanh(readings[0]*weights[p,9] +
-                        readings[1]*weights[p,10] +
-                        readings[2]*weights[p,11] + biases[p,3])
-            
-            vl = math.tanh(h0*weights[p,12] +
-                        h1*weights[p,13] +
-                        h2*weights[p,14] +
-                        h3*weights[p,15] + biases[p,4])
-            vr = math.tanh(h0*weights[p,16] +
-                        h1*weights[p,17] +
-                        h2*weights[p,18] +
-                        h3*weights[p,19] + biases[p,5])
-            
-            vl *= 255.0
-            vr *= 255.0
-
-            # -------- kinematics (differential drive) -------------------
-            (x[p], y[p], hd[p], vel[p], ang_v[p], pwmL[p], pwmR[p]) = move_step(
-                    x[p],   y[p],
-                    hd[p],
-                    vel[p], ang_v[p],
-                    pwmL[p], pwmR[p],
-                    vl, vr,
-                    dt,
-                    MAX_SPEED, MAX_ROT_SPEED,
-                    MAX_ACC,  MAX_ROT_ACC)
-            
-            if step < 10:
-                print(p, step, x[p], y[p], hd[p], vel[p])
-            
-            if circle_rect_collides(x[p], y[p], robot_radius, rects):
-                # crash: cut episode short
-                #fitness[p] += crash_penalty                 # or simply leave fitness as-is
-                #alive[p] = False                            # optional flag
-                continue                                    # skip to next individual
-
-
-            # -------- fitness bookkeeping ------------------------------
-            fitness[p] += 1                         # e.g. alive-time
-            # you can also deduct penalty if readings.min()<crash_thresh
-
-    return fitness * dt
+JITTER_PENALTY = 0.1  # penalty for PWM jitter
+CLEARANCE_REWARD = 0.2   # per sensor unit
+NEW_CELL_REWARD = 1.0      # per fresh cell
+STALE_LIMIT     = 40       # steps (~2 s at 20 Hz)
 
 @njit(parallel=True, fastmath=True, cache=True)
+# @njit(fastmath=True, cache=True)
 def run_generation(population: float32[:, :],      # (P, N) array of P chromosomes (N floats each) dependent on controller_fn
                    rects:       float32[:, :],      # (N, 4) obstacles
                    controller_fn,                  # callable(chrom, sensors) -> (pwmL,pwmR)
                    sensor_fn,                      # callable(px,py,hd, rects,r) -> 3-array
+                   sensor_range: float32,         # sensor range (px)
                    move_fn,                        # callable(state, cmdL, cmdR, dt) -> new state
                    steps:       int32,
                    dt:          float32,
-                   robot_r:     float32):
+                   robot_r:     float32,
+                   world_width: float32,
+                   world_height: float32,
+                   starting_x: float32,
+                   starting_y: float32) -> float32[:]:
 
-    pop_size  = population.shape[0]
-    fitness   = np.zeros(pop_size, dtype=np.float32)
+    pop_size        = population.shape[0]
+    fitness         = np.zeros(pop_size, dtype=np.float32)
+    grid_cell_size  = robot_r * 2.0
+    inverted_gcs    = 1.0 / grid_cell_size
+    W_GRID   = int(np.ceil(world_width  * inverted_gcs))
+    H_GRID   = int(np.ceil(world_height * inverted_gcs))
+
+    inverted_sensor_range    = 1.0 / sensor_range
 
     # ── per-robot state vectors (all float32) ────────────────────────
-    x        = np.full(pop_size, 120.0,  np.float32)   # start X
-    y        = np.full(pop_size, 120.0,  np.float32)   # start Y
+    x        = np.full(pop_size, starting_x,  np.float32)   # start X
+    y        = np.full(pop_size, starting_y,  np.float32)   # start Y
     heading  = np.zeros(pop_size,        np.float32)   # deg CW
     velocity = np.zeros(pop_size,        np.float32)   # px/s
     ang_vel  = np.zeros(pop_size,        np.float32)   # deg/s
     pwmL     = np.zeros(pop_size,        np.float32)
     pwmR     = np.zeros(pop_size,        np.float32)
+    visited = np.zeros((pop_size, W_GRID, H_GRID), dtype=np.uint8)  # bit-mask
+    visit_ct = np.zeros(pop_size, dtype=np.int32)                   # counter
+    stale_ctr = np.zeros(pop_size, dtype=np.int32)                  # stagnation
+
 
     # ────────────────── main GA batch loop (parallel) ────────────────
     for p in prange(pop_size):
 
         chrom = population[p]            # view into 26-float chromosome
+        # crashed = False
+        # spinner = False
 
         for step in range(steps):
 
             # 1) sense
             sensors = sensor_fn(x[p], y[p], heading[p], rects, robot_r)
 
+            # clearance reward
+            fitness[p] += min(sensors) * inverted_sensor_range * CLEARANCE_REWARD
+
             # 2) decide (NN or heuristic)
             cmdL, cmdR = controller_fn(chrom, sensors)   # returns (−1…1)
             cmdL *= 255.0
             cmdR *= 255.0
+
+            # smoothness reward
+            if step > 0:
+                fitness[p] -= (abs(cmdL - pwmL[p]) + abs(cmdR - pwmR[p])) * JITTER_PENALTY
 
             # 3) move
             (x[p], y[p], heading[p],
@@ -137,16 +78,44 @@ def run_generation(population: float32[:, :],      # (P, N) array of P chromosom
                     pwmL[p], pwmR[p],
                     cmdL, cmdR,
                     dt)
+            
+            # 3.1) update visited grid cells
+            # integer cell indices
+            gx = int(math.floor(x[p] * inverted_gcs))
+            gy = int(math.floor(y[p] * inverted_gcs))
+
+            # within map bounds?
+            if 0 <= gx < W_GRID and 0 <= gy < H_GRID:
+                if visited[p, gx, gy] == 0:
+                    visited[p, gx, gy] = 1
+                    visit_ct[p]      += 1
+                    stale_ctr[p]      = 0          # reset spinner timer
+                    # optional fitness bump
+                    fitness[p] += NEW_CELL_REWARD
+                else:
+                    stale_ctr[p] += 1
+                    if stale_ctr[p] >= STALE_LIMIT:
+                        # print("\tspinner!!!!\t\t", p, step, x[p], y[p])
+                        # spinner = True
+                        break                      # terminate early
+
+            
+            # if step < 10:
+            #     print(p, step, x[p], y[p], heading[p], velocity[p])
 
             # 4) crash?
             if circle_rect_collides(x[p], y[p], robot_r, rects):
+                # print("\tcrash at\t\t", p, step, x[p], y[p])
+                # crashed = True
                 break                     # episode ends early
 
             # 5) reward (1 point per alive step)
             fitness[p] += 1.0
 
-    return fitness
+        # if not crashed and not spinner:
+        #     print("!!!!! (timeout??)", p, step, x[p], y[p])
 
+    return fitness
 
 @njit(fastmath=True, cache=True)
 def circle_rect_collides(px: float, py: float,
