@@ -8,7 +8,7 @@ import numpy as np
 
 from jit_sim.helpers        import load_spec, load_map
 from jit_sim.core_kernels   import circle_rect_collides
-from .helpers               import show_debug_info   # your existing HUD
+from .helpers               import show_debug_info
 
 PIX_PER_M = 500.0   # pixels per meter  (world→screen scale)
 
@@ -71,36 +71,41 @@ def run_simulation():
     dt                = cfg.get("dt", 0.05)
 
     # plug-ins
-    controller_fn, ctrl_kwargs = load_spec(cfg["controller"])
-    sensor_fn,     sens_kwargs = load_spec(cfg["sensor"])
-    move_fn,       robot_kwargs= load_spec(cfg["robot"])
+    controller_fn, ctrl_kwargs      = load_spec(cfg["controller"])
+    sensor_fn,     sens_kwargs      = load_spec(cfg["sensor"])
+    move_fn,       robot_kwargs     = load_spec(cfg["robot"])
+    _,             opt_kwargs       = load_spec(cfg["optimizer"])
 
     # map + size
     rects, map_kwargs = load_map(cfg["map"])
     world_w = map_kwargs.get("width_px", 1280.0)
     world_h = map_kwargs.get("height_px", 720.0)
     start_x = map_kwargs.get("starting_x", 75.0)
-    start_y = map_kwargs.get("starting_y", 75.0)  # fixed typo
+    start_y = map_kwargs.get("starting_y", 75.0)
 
     # robot constants
     robot_r = robot_kwargs["wheel_radius_m"] * PIX_PER_M
 
-    # best chromosome lookup (same logic you had) ----------------------
+    # best chromosome lookup ----------------------
     best_chrom = None
     out_dir = Path("saved_chromosomes")
-    best_fit = -np.inf
-    pat = re.compile(r"seed_chromosome_gen\d+_(\d+)fitness\.npy")
-    for f in out_dir.glob("seed_chromosome_gen*_*.npy"):
-        m = pat.match(f.name)
-        if m and int(m.group(1)) > best_fit:
-            best_fit, best_chrom = int(m.group(1)), f
-    if best_chrom is None:
-        raise FileNotFoundError("No chromosome file found!")
-    chromosome = np.load(best_chrom).astype(np.float32)
+    if(os.path.exists(out_dir / opt_kwargs.get("seed_chrom", "xxxx"))):
+        # load seed chromosome from file
+        chromosome = np.load(out_dir / opt_kwargs["seed_chrom"]).astype(np.float32)
+    else:
+        best_fit = -np.inf
+        pat = re.compile(r"seed_chromosome(_gen\d+)?_(\d+)fitness\.npy")
+        for f in out_dir.glob("seed_chromosome*.npy"):
+            m = pat.match(f.name)
+            if m and int(m.group(2)) > best_fit:
+                best_fit, best_chrom = int(m.group(1)), f
+        if best_chrom is None:
+            raise FileNotFoundError("No chromosome file found!")
+        chromosome = np.load(best_chrom).astype(np.float32)
 
     # state vars
     x, y            = start_x, start_y
-    heading_deg     = -90.0
+    heading_deg     = 0.0
     velocity        = 0.0
     ang_vel         = 0.0
     pwmL = pwmR     = 0.0

@@ -38,7 +38,8 @@ class GAOptimizer:
         self.sigma_decay    = sigma_decay
         self.rng            = np.random.default_rng(rng_seed)
 
-        self._seed_chrom_path   = Path(seed_chrom)     if seed_chrom   else None
+        out_dir = Path("saved_chromosomes") # todo: how to pass this?
+        self._seed_chrom_path   = out_dir / seed_chrom     if seed_chrom   else None
         self._population_path   = Path(population_file) if population_file else None
 
     # ───── population bootstrap ───────────────────────────────────────

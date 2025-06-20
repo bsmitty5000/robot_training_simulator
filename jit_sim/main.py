@@ -48,12 +48,12 @@ best_chromosomes = []
 output_dir = Path("saved_chromosomes")
 
 # Regex to extract fitness score from filename
-pattern = re.compile(r"seed_chromosome_gen\d+_(\d+)fitness\.npy")
+pattern = re.compile(r"seed_chromosome(_gen\d+)?_(\d+)fitness\.npy")
 
-for file in output_dir.glob("seed_chromosome_gen*_*.npy"):
+for file in output_dir.glob("seed_chromosome*.npy"):
     match = pattern.match(file.name)
     if match:
-        fitness = int(match.group(1))
+        fitness = int(match.group(2))
         if fitness > global_best_fitness:
             global_best_fitness = fitness
 
@@ -102,7 +102,7 @@ print(f"{generations} Generations took: {t1-t0:0.3f} s")
 
 best_of_the_best_idx = np.argmax(best_fitnesses)
 
-if( best_fitnesses[best_of_the_best_idx] > global_best_fitness ):
+if( best_fitnesses[best_of_the_best_idx] > global_best_fitness or cfg.get("save_best", False) ):
     output_dir.mkdir(exist_ok=True)  # Create directory if it doesn't exist
 
     seed_file_path = output_dir / f"seed_chromosome_{best_fitnesses[best_of_the_best_idx]:.0f}fitness.npy"

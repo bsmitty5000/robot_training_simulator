@@ -49,7 +49,7 @@ class TwoWheelTT(RobotBase):
         self.left_pwm = 0.0
         self.right_pwm = 0.0
 
-        self.angle_deg = -90.0  # Initial angle in degrees, facing right
+        self.angle_deg = 0.0  # Initial angle in degrees, facing right
         self.speed = 0.0
         self.rotation_speed = 0.0
         self.max_speed = 50.0
