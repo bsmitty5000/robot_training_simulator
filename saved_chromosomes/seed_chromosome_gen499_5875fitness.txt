@@ -1,0 +1,9 @@
+this chromosome is the best of 500 generations of 1024 individuals
+it exhibits incredible obstacle avoidance like all of the best
+now and it can stay incredibly straight on the straightaways, but
+it can't turn at all, and i'm not sure if it's right turn onlys or what.
+it seems once it hits a wall there's a point where the sensor inputs
+and the controller outputs stabilize.
+
+again i think something is off with how i'm
+currently rewarding/punishing behavior.
