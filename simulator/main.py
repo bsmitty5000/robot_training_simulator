@@ -1,5 +1,6 @@
 import re
 import os
+import time
 
 from ml_stuff.ff_net_decision_maker import FFNetDecisionMaker
 import simulator.constants as constants
@@ -56,9 +57,15 @@ def main():
         if constants.NO_RANDOM:
             cx_rate = 0.0
             mut_rate = 0.0
+            
+        start = time.time()
+
         fitness_history = ga.run(constants.WIDTH, constants.HEIGHT,
                 cx_rate=cx_rate,
                 mut_rate=mut_rate)
+        
+        end = time.time()
+        print(f"GA run took {end - start:.2f} seconds")
         
         
         # plt.plot(fitness_history)
