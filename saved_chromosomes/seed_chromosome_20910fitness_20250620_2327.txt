@@ -1,0 +1,18 @@
+first ever chromosome that makes it the entire course!
+
+couple of subtle bugs were sabotaging me:
+
+1.  i was pulling the width and height values from the json and swapping
+    them, so the coverage grid was inverted. this allowed some robots
+    to have coordinates outside the bounds of the coverage grid. and i
+    didn't double check chatGpts version of coverage checking closely enough
+    because there was a check to make sure the robot was within the grid
+    boundaries for safe indexing, but there was no 'else' statement to catch
+    if the robot was outside the boundaries. so some robots were stuck or 
+    spinning but able to rack up huge keep alive rewards
+2.  i finally figured out why the robots had a hard time turning right but not
+    left- i was starting them at (75,75) because the first wall started
+    at y = 150. but the course boundary has a width of 10, which meant the
+    robot was actually starting 65 pixels from the top boundary and 75 pixels
+    from the first wall. once i changed to start at (80,80) so it's an even
+    distance of 70 pixels from each wall right turns were no longer a problem
