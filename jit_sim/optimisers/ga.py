@@ -40,7 +40,7 @@ class GAOptimizer:
 
         out_dir = Path("saved_chromosomes") # todo: how to pass this?
         self._seed_chrom_path   = out_dir / seed_chrom     if seed_chrom   else None
-        self._population_path   = Path(population_file) if population_file else None
+        self._population_path   = out_dir / population_file if population_file else None
 
     # ───── population bootstrap ───────────────────────────────────────
     def initial_population(self) -> np.ndarray:
@@ -62,9 +62,7 @@ class GAOptimizer:
             return (seed + noise)
 
         # 3) Pure random initialisation (default)
-        W = self.rng.normal(0.0, 0.3, size=(self.pop_size, 20)).astype(np.float32)
-        b = np.zeros((self.pop_size, 6), dtype=np.float32)
-        return np.concatenate([W, b], axis=1)
+        return self.rng.normal(0.0, 0.3, size=(self.pop_size, self.chrom_len)).astype(np.float32)
 
     # ───── GA step: produce next gen from current pop & fitness ───────
     def next_generation(self,

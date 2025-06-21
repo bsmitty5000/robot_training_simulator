@@ -1,4 +1,5 @@
 
+import time
 import pygame
 import math
 import json, os, re, sys
@@ -7,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from jit_sim.helpers        import load_spec, load_map
-from jit_sim.core_kernels   import circle_rect_collides
+import jit_sim.core_kernels as core_kernels
 from .helpers               import show_debug_info
 
 PIX_PER_M = 500.0   # pixels per meter  (world→screen scale)
@@ -91,17 +92,15 @@ def run_simulation():
     out_dir = Path("saved_chromosomes")
     if(os.path.exists(out_dir / opt_kwargs.get("seed_chrom", "xxxx"))):
         # load seed chromosome from file
+        print(f"Loading seed chromosome from {out_dir / opt_kwargs["seed_chrom"]}")
         chromosome = np.load(out_dir / opt_kwargs["seed_chrom"]).astype(np.float32)
     else:
-        best_fit = -np.inf
-        pat = re.compile(r"seed_chromosome(_gen\d+)?_(\d+)fitness\.npy")
-        for f in out_dir.glob("seed_chromosome*.npy"):
-            m = pat.match(f.name)
-            if m and int(m.group(2)) > best_fit:
-                best_fit, best_chrom = int(m.group(1)), f
-        if best_chrom is None:
+        files = list(out_dir.glob("seed_chromosome*.npy"))
+        if not files:
             raise FileNotFoundError("No chromosome file found!")
-        chromosome = np.load(best_chrom).astype(np.float32)
+        latest_file = max(files, key=lambda f: f.stat().st_mtime)
+        print(f"Loading latest chromosome from {latest_file}")
+        chromosome = np.load(latest_file).astype(np.float32)
 
     # state vars
     x, y            = start_x, start_y
@@ -110,6 +109,17 @@ def run_simulation():
     ang_vel         = 0.0
     pwmL = pwmR     = 0.0
 
+    fitness        = 0.0
+    grid_cell_size  = robot_r * 2.0
+    inverted_gcs    = 1.0 / grid_cell_size
+    W_GRID   = int(np.ceil(world_w  * inverted_gcs))
+    H_GRID   = int(np.ceil(world_h * inverted_gcs))
+    visited = np.zeros((W_GRID, H_GRID), dtype=np.uint8)
+    visit_ct = 0
+
+    sensor_range = sens_kwargs["max_range_m"] * PIX_PER_M
+    sensor_reward_multiplier = core_kernels.CLEARANCE_REWARD / (sens_kwargs["num_sensors"] * sensor_range)
+
     running = True
     step    = 0
     sensor_max = sens_kwargs.get("max_range", 150.0)
@@ -117,6 +127,8 @@ def run_simulation():
     screen = pygame.display.set_mode((world_w, world_h))
     clock  = pygame.time.Clock()
 
+    state_log = open("visual_robot_states.csv", "a")
+    t0 = time.perf_counter()
     while running and step < steps_per_episode:
         # ---------------- Pygame events ------------------------------
         for event in pygame.event.get():
@@ -127,16 +139,53 @@ def run_simulation():
 
         # ---------------- JIT pipeline -------------------------------
         sensors = sensor_fn(x, y, heading_deg, rects, robot_r)
+
+        clearance_reward = sensors.sum() * sensor_reward_multiplier
+        fitness += clearance_reward
+
+        
+        open_space_bonus = np.sum(sensors >= \
+                                  (sensor_range * core_kernels.OPEN_SPACE_REWARD_CUTOFF))\
+                                      * core_kernels.OPEN_SPACE_REWARD
+        fitness += open_space_bonus
+
         cmdL_raw, cmdR_raw = controller_fn(chromosome, sensors)
         cmdL = cmdL_raw * 255.0
         cmdR = cmdR_raw * 255.0
 
+        
+        if step > 0:
+            jitter_penalty = (abs(cmdL - pwmL) + abs(cmdR - pwmR)) * core_kernels.JITTER_PENALTY
+            fitness -= jitter_penalty
+
         x, y, heading_deg, velocity, ang_vel, pwmL, pwmR = move_fn(
             x, y, heading_deg, velocity, ang_vel, pwmL, pwmR, cmdL, cmdR, dt)
+        
+        state_log.write(f"0,{step},{sensors[0]},{sensors[1]},{sensors[2]},{x},{y},{heading_deg},{velocity},{ang_vel},{pwmL},{pwmR},{fitness}\n")
 
-        if circle_rect_collides(x, y, robot_r, rects):
+        gx = int(math.floor(x * inverted_gcs))
+        gy = int(math.floor(y * inverted_gcs))
+
+        # within map bounds?
+        if 0 <= gx < W_GRID and 0 <= gy < H_GRID:
+            if visited[gx, gy] == 0:
+                visited[gx, gy] = 1
+                visit_ct      += 1
+                stale_ctr      = 0          # reset spinner timer
+                # optional fitness bump
+                fitness += core_kernels.NEW_CELL_REWARD
+            else:
+                stale_ctr += 1
+                if stale_ctr >= core_kernels.STALE_LIMIT:
+                    fitness -= core_kernels.TIMEOUT_PENALTY
+                    print("Spinner detected! Terminating early.")
+                    break
+
+        if core_kernels.circle_rect_collides(x, y, robot_r, rects):
             print("Crash!")
             break
+
+        fitness += 1.0 * core_kernels.KEEP_ALIVE_REWARD
 
         # ---------------- drawing ------------------------------------
         screen.fill((30, 30, 30))
@@ -148,12 +197,16 @@ def run_simulation():
                         sensors,
                         np.array([x, y, heading_deg]),
                         np.array([cmdL_raw, cmdR_raw]),
-                        np.array([pwmL, pwmR]))
+                        np.array([pwmL, pwmR]),
+                        fitness)
 
         pygame.display.flip()
         clock.tick(1 / dt)
         step += 1
 
+    state_log.close()
+    t1 = time.perf_counter()
+    print(f"Simulation ended after {step} steps and {t1-t0:0.3f} s with fitness: {fitness:.2f}")
     pygame.quit()
 
 if __name__ == "__main__":

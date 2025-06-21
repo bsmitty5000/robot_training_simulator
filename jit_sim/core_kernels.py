@@ -3,16 +3,21 @@ from numba import njit, prange
 import numpy as np
 
 JITTER_PENALTY = 0.1  # penalty for PWM jitter
-CLEARANCE_REWARD = 0.2   # per sensor unit
-NEW_CELL_REWARD = 1.0      # per fresh cell
+CLEARANCE_REWARD = 1.0   # per sensor unit
+NEW_CELL_REWARD = 50.0      # per fresh cell
+KEEP_ALIVE_REWARD = 0.5  # per alive step
 STALE_LIMIT     = 40       # steps (~2 s at 20 Hz)
+TIMEOUT_PENALTY = KEEP_ALIVE_REWARD * STALE_LIMIT  # offset for the keep_alive reward
+OPEN_SPACE_REWARD_CUTOFF = 0.95  # sensor value cutoff for open space reward
+OPEN_SPACE_REWARD = 2.0  # per sensor detecting max range
 
-@njit(parallel=True, fastmath=True, cache=True)
+# @njit(parallel=True, fastmath=True, cache=True)
 # @njit(fastmath=True, cache=True)
 def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes (N floats each) dependent on controller_fn
                    rects:       np.ndarray,      # (N, 4) obstacles
                    controller_fn,                  # callable(chrom, sensors) -> (pwmL,pwmR)
                    sensor_fn,                      # callable(px,py,hd, rects,r) -> 3-array
+                   num_sensors: np.float32,         # length of sensor array (3 for sharpir)
                    sensor_range: np.float32,         # sensor range (px)
                    move_fn,                        # callable(state, cmdL, cmdR, dt) -> new state
                    steps:       np.int32,
@@ -30,7 +35,7 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
     W_GRID   = int(np.ceil(world_width  * inverted_gcs))
     H_GRID   = int(np.ceil(world_height * inverted_gcs))
 
-    inverted_sensor_range    = 1.0 / sensor_range
+    sensor_reward_multiplier = CLEARANCE_REWARD / (num_sensors * sensor_range)
 
     # ── per-robot state vectors (all float32) ────────────────────────
     x        = np.full(pop_size, starting_x,  np.float32)   # start X
@@ -44,6 +49,7 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
     visit_ct = np.zeros(pop_size, dtype=np.int32)                   # counter
     stale_ctr = np.zeros(pop_size, dtype=np.int32)                  # stagnation
 
+    state_log = open("jit_robot_states.csv", "a")
 
     # ────────────────── main GA batch loop (parallel) ────────────────
     for p in prange(pop_size):
@@ -58,7 +64,17 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
             sensors = sensor_fn(x[p], y[p], heading[p], rects, robot_r)
 
             # clearance reward
-            fitness[p] += min(sensors) * inverted_sensor_range * CLEARANCE_REWARD
+            clearance_reward = sensors.sum() * sensor_reward_multiplier
+            fitness[p] += clearance_reward
+            # if step < 10:
+            #     print("clearance reward:", p, step, clearance_reward, fitness[p])
+            
+            open_space_bonus = np.sum(sensors >= \
+                                      (sensor_range * OPEN_SPACE_REWARD_CUTOFF))\
+                                          * OPEN_SPACE_REWARD
+            fitness[p] += open_space_bonus
+            # if step < 10:
+            #     print("clearance reward:", p, step, open_space_bonus, fitness[p])
 
             # 2) decide (NN or heuristic)
             cmdL, cmdR = controller_fn(chrom, sensors)   # returns (−1…1)
@@ -67,7 +83,10 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
 
             # smoothness reward
             if step > 0:
-                fitness[p] -= (abs(cmdL - pwmL[p]) + abs(cmdR - pwmR[p])) * JITTER_PENALTY
+                jitter_penalty = (abs(cmdL - pwmL[p]) + abs(cmdR - pwmR[p])) * JITTER_PENALTY
+                fitness[p] -= jitter_penalty
+                # if step < 10:
+                #     print("jitter penalty:", p, step, jitter_penalty, fitness[p])
 
             # 3) move
             (x[p], y[p], heading[p],
@@ -78,6 +97,9 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
                     pwmL[p], pwmR[p],
                     cmdL, cmdR,
                     dt)
+            
+            if(p == 0):
+                state_log.write(f"{p},{step},{sensors[0]},{sensors[1]},{sensors[2]},{x[p]},{y[p]},{heading[p]},{velocity[p]},{ang_vel[p]},{pwmL[p]},{pwmR[p]},{fitness[p]}\n")
             
             # 3.1) update visited grid cells
             # integer cell indices
@@ -96,12 +118,15 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
                     stale_ctr[p] += 1
                     if stale_ctr[p] >= STALE_LIMIT:
                         # print("\tspinner!!!!\t\t", p, step, x[p], y[p])
-                        # spinner = True
+                        fitness[p] -= TIMEOUT_PENALTY
                         break                      # terminate early
+            else:
+                # treat out of bounds like a collision
+                break
 
             
             # if step < 10:
-            #     print(p, step, x[p], y[p], heading[p], velocity[p])
+                # print(p, step, x[p], y[p], heading[p], velocity[p])
 
             # 4) crash?
             if circle_rect_collides(x[p], y[p], robot_r, rects):
@@ -110,11 +135,12 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
                 break                     # episode ends early
 
             # 5) reward (1 point per alive step)
-            fitness[p] += 1.0
+            fitness[p] += 1.0 * KEEP_ALIVE_REWARD
 
         # if not crashed and not spinner:
-        #     print("!!!!! (timeout??)", p, step, x[p], y[p])
+            # print("!!!!! (timeout??)", p, step, x[p], y[p])
 
+        state_log.close()
     return fitness
 
 @njit(fastmath=True, cache=True)

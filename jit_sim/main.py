@@ -3,6 +3,7 @@ main.py – wiring layer
 Loads the plug-ins named in sim_config.json, then runs one GA generation.
 """
 
+from datetime import datetime
 import re
 import json, importlib, time
 from pathlib import Path
@@ -36,10 +37,10 @@ OptClass,       opt_kwargs      = load_spec(cfg["optimizer"])
 
 # map
 obstacles,      map_kwargs      = load_map(cfg["map"])     # shape (N,4)
-world_width     = map_kwargs.get("height_px", 1280.0)
-world_height    = map_kwargs.get("width_px", 720.0)
+world_width     = map_kwargs.get("width_px", 1280.0)
+world_height    = map_kwargs.get("height_px", 720.0)
 starting_x      = map_kwargs.get("starting_x", 75.0)
-starting_y      = map_kwargs.get("staring_y", 75.0)
+starting_y      = map_kwargs.get("starting_y", 75.0)
 
 # Bookkeeping
 global_best_fitness = 3000
@@ -48,7 +49,7 @@ best_chromosomes = []
 output_dir = Path("saved_chromosomes")
 
 # Regex to extract fitness score from filename
-pattern = re.compile(r"seed_chromosome(_gen\d+)?_(\d+)fitness\.npy")
+pattern = re.compile(r"seed_chromosome(_gen\d+)?_(\d+)fitness")
 
 for file in output_dir.glob("seed_chromosome*.npy"):
     match = pattern.match(file.name)
@@ -60,6 +61,10 @@ for file in output_dir.glob("seed_chromosome*.npy"):
 # ────────────────────────────────────────────────────────────────────
 # 3. optimiser & population
 # ────────────────────────────────────────────────────────────────────
+
+if 'chrom_len' in ctrl_kwargs:
+    opt_kwargs["chrom_len"] = ctrl_kwargs["chrom_len"]
+
 optimizer   = OptClass(**opt_kwargs)           # e.g. GAOptimizer(population=256,…)
 population  = optimizer.initial_population()   # (pop, chrom_len) float32
 fitness_buf = np.empty(population.shape[0], dtype=np.float32)
@@ -80,6 +85,7 @@ for g in range(generations):
                                     obstacles,
                                     controller_fn,
                                     sensor_fn,
+                                    sens_kwargs["num_sensors"],
                                     sens_kwargs["max_range_m"] * 500.0,  # px/m * 0.3m range
                                     move_fn,
                                     steps_per_episode,
@@ -102,10 +108,12 @@ print(f"{generations} Generations took: {t1-t0:0.3f} s")
 
 best_of_the_best_idx = np.argmax(best_fitnesses)
 
+print(f"Best fitness: {best_fitnesses[best_of_the_best_idx]:.0f} at generation {best_of_the_best_idx}")
+
 if( best_fitnesses[best_of_the_best_idx] > global_best_fitness or cfg.get("save_best", False) ):
     output_dir.mkdir(exist_ok=True)  # Create directory if it doesn't exist
 
-    seed_file_path = output_dir / f"seed_chromosome_{best_fitnesses[best_of_the_best_idx]:.0f}fitness.npy"
+    seed_file_path = output_dir / f"seed_chromosome_{best_fitnesses[best_of_the_best_idx]:.0f}fitness_{datetime.now().strftime("%Y%m%d_%H%M")}.npy"
     np.save(seed_file_path, best_chromosomes[best_of_the_best_idx].astype(np.float32))
 
 plt.plot(best_fitnesses)
