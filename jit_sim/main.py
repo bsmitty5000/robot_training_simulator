@@ -30,10 +30,10 @@ dt                  = cfg.get("dt", 0.05)
 generations         = cfg.get("generations", 5)
 
 # plug-ins
-controller_fn,  ctrl_kwargs     = load_spec(cfg["controller"])
-sensor_fn,      sens_kwargs     = load_spec(cfg["sensor"])
-move_fn,        robot_kwargs    = load_spec(cfg["robot"])
-OptClass,       opt_kwargs      = load_spec(cfg["optimizer"])
+ControllerClass,    ctrl_kwargs     = load_spec(cfg["controller"])
+sensor_fn,          sens_kwargs     = load_spec(cfg["sensor"])
+move_fn,            robot_kwargs    = load_spec(cfg["robot"])
+OptClass,           opt_kwargs      = load_spec(cfg["optimizer"])
 
 # map
 obstacles,      map_kwargs      = load_map(cfg["map"])     # shape (N,4)
@@ -62,10 +62,8 @@ for file in output_dir.glob("seed_chromosome*.npy"):
 # 3. optimiser & population
 # ────────────────────────────────────────────────────────────────────
 
-if 'chrom_len' in ctrl_kwargs:
-    opt_kwargs["chrom_len"] = ctrl_kwargs["chrom_len"]
-
-optimizer   = OptClass(**opt_kwargs)           # e.g. GAOptimizer(population=256,…)
+controller  = ControllerClass(**ctrl_kwargs)  # e.g. controller = FeedForwardNNController()
+optimizer   = OptClass(chrom_len= controller.chrom_len(), **opt_kwargs)           # e.g. GAOptimizer(population=256,…)
 population  = optimizer.initial_population()   # (pop, chrom_len) float32
 fitness_buf = np.empty(population.shape[0], dtype=np.float32)
 
@@ -83,7 +81,8 @@ for g in range(generations):
 
     fitness_buf[:] = run_generation(population,
                                     obstacles,
-                                    controller_fn,
+                                    controller.fwd,
+                                    controller.chrom_fmt(),
                                     sensor_fn,
                                     sens_kwargs["num_sensors"],
                                     sens_kwargs["max_range_m"] * 500.0,  # px/m * 0.3m range

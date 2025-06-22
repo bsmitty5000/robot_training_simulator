@@ -6,16 +6,17 @@ JITTER_PENALTY = 0.1  # penalty for PWM jitter
 CLEARANCE_REWARD = 1.0   # per sensor unit
 NEW_CELL_REWARD = 50.0      # per fresh cell
 KEEP_ALIVE_REWARD = 0.5  # per alive step
-STALE_LIMIT     = 40       # steps (~2 s at 20 Hz)
+STALE_LIMIT     = 80       # steps (~2 s at 20 Hz)
 TIMEOUT_PENALTY = KEEP_ALIVE_REWARD * STALE_LIMIT  # offset for the keep_alive reward
 OPEN_SPACE_REWARD_CUTOFF = 0.95  # sensor value cutoff for open space reward
 OPEN_SPACE_REWARD = 2.0  # per sensor detecting max range
 
-# @njit(parallel=True, fastmath=True, cache=True)
+@njit(parallel=True, fastmath=True, cache=True)
 # @njit(fastmath=True, cache=True)
 def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes (N floats each) dependent on controller_fn
                    rects:       np.ndarray,      # (N, 4) obstacles
                    controller_fn,                  # callable(chrom, sensors) -> (pwmL,pwmR)
+                   chrom_fmt,                     # chromosome format (e.g. "nn_3x6x2")
                    sensor_fn,                      # callable(px,py,hd, rects,r) -> 3-array
                    num_sensors: np.float32,         # length of sensor array (3 for sharpir)
                    sensor_range: np.float32,         # sensor range (px)
@@ -45,11 +46,12 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
     ang_vel  = np.zeros(pop_size,        np.float32)   # deg/s
     pwmL     = np.zeros(pop_size,        np.float32)
     pwmR     = np.zeros(pop_size,        np.float32)
+
     visited = np.zeros((pop_size, W_GRID, H_GRID), dtype=np.uint8)  # bit-mask
     visit_ct = np.zeros(pop_size, dtype=np.int32)                   # counter
     stale_ctr = np.zeros(pop_size, dtype=np.int32)                  # stagnation
 
-    state_log = open("jit_robot_states.csv", "a")
+    #state_log = open("jit_robot_states.csv", "a")
 
     # ────────────────── main GA batch loop (parallel) ────────────────
     for p in prange(pop_size):
@@ -76,30 +78,30 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
             # if step < 10:
             #     print("clearance reward:", p, step, open_space_bonus, fitness[p])
 
-            # 2) decide (NN or heuristic)
-            cmdL, cmdR = controller_fn(chrom, sensors)   # returns (−1…1)
-            cmdL *= 255.0
-            cmdR *= 255.0
+            # NN gets previous-step IMU (gyro_z, accel_x) plus IRs
+            cntrl_out = controller_fn(chrom, chrom_fmt, sensors)   # single output ∈ [-1, 1]
 
             # smoothness reward
-            if step > 0:
-                jitter_penalty = (abs(cmdL - pwmL[p]) + abs(cmdR - pwmR[p])) * JITTER_PENALTY
-                fitness[p] -= jitter_penalty
+            # if step > 0:
+            #     jitter_penalty = (abs(cmdL - pwmL[p]) + abs(cmdR - pwmR[p])) * JITTER_PENALTY
+            #     fitness[p] -= jitter_penalty
                 # if step < 10:
                 #     print("jitter penalty:", p, step, jitter_penalty, fitness[p])
 
             # 3) move
             (x[p], y[p], heading[p],
-             velocity[p], ang_vel[p],
-             pwmL[p], pwmR[p]) = move_fn(
-                    x[p], y[p], heading[p],
-                    velocity[p], ang_vel[p],
-                    pwmL[p], pwmR[p],
-                    cmdL, cmdR,
-                    dt)
-            
-            if(p == 0):
-                state_log.write(f"{p},{step},{sensors[0]},{sensors[1]},{sensors[2]},{x[p]},{y[p]},{heading[p]},{velocity[p]},{ang_vel[p]},{pwmL[p]},{pwmR[p]},{fitness[p]}\n")
+                velocity[p], ang_vel[p],
+                pwmL[p], pwmR[p]) = move_fn(
+                        x[p], y[p],
+                        heading[p],
+                        velocity[p],
+                        ang_vel[p],
+                        pwmL[p], pwmR[p],
+                        cntrl_out,
+                        dt)
+
+            # if(p == 0):
+            #     state_log.write(f"{p},{step},{sensors[0]},{sensors[1]},{sensors[2]},{x[p]},{y[p]},{heading[p]},{velocity[p]},{ang_vel[p]},{pwmL[p]},{pwmR[p]},{fitness[p]}\n")
             
             # 3.1) update visited grid cells
             # integer cell indices
@@ -140,7 +142,7 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
         # if not crashed and not spinner:
             # print("!!!!! (timeout??)", p, step, x[p], y[p])
 
-        state_log.close()
+        # state_log.close()
     return fitness
 
 @njit(fastmath=True, cache=True)

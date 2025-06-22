@@ -72,7 +72,7 @@ def run_simulation():
     dt                = cfg.get("dt", 0.05)
 
     # plug-ins
-    controller_fn, ctrl_kwargs      = load_spec(cfg["controller"])
+    ControllerClass,    ctrl_kwargs     = load_spec(cfg["controller"])
     sensor_fn,     sens_kwargs      = load_spec(cfg["sensor"])
     move_fn,       robot_kwargs     = load_spec(cfg["robot"])
     _,             opt_kwargs       = load_spec(cfg["optimizer"])
@@ -86,6 +86,8 @@ def run_simulation():
 
     # robot constants
     robot_r = robot_kwargs["wheel_radius_m"] * PIX_PER_M
+    controller  = ControllerClass(**ctrl_kwargs)
+    controller_fn = controller.fwd if hasattr(controller, "fwd") else controller
 
     # best chromosome lookup ----------------------
     best_chrom = None
@@ -127,7 +129,6 @@ def run_simulation():
     screen = pygame.display.set_mode((world_w, world_h))
     clock  = pygame.time.Clock()
 
-    state_log = open("visual_robot_states.csv", "a")
     t0 = time.perf_counter()
     while running and step < steps_per_episode:
         # ---------------- Pygame events ------------------------------
@@ -149,19 +150,24 @@ def run_simulation():
                                       * core_kernels.OPEN_SPACE_REWARD
         fitness += open_space_bonus
 
-        cmdL_raw, cmdR_raw = controller_fn(chromosome, sensors)
-        cmdL = cmdL_raw * 255.0
-        cmdR = cmdR_raw * 255.0
+        cntrl_out = controller_fn(chromosome, controller.chrom_fmt(), sensors)
 
-        
-        if step > 0:
-            jitter_penalty = (abs(cmdL - pwmL) + abs(cmdR - pwmR)) * core_kernels.JITTER_PENALTY
-            fitness -= jitter_penalty
+        # if step > 0:
+        #     jitter_penalty = (abs(cmdL - pwmL) + abs(cmdR - pwmR)) * core_kernels.JITTER_PENALTY
+        #     fitness -= jitter_penalty
 
-        x, y, heading_deg, velocity, ang_vel, pwmL, pwmR = move_fn(
-            x, y, heading_deg, velocity, ang_vel, pwmL, pwmR, cmdL, cmdR, dt)
+        (x, y, heading_deg,
+            velocity, ang_vel,
+            pwmL, pwmR) = move_fn(
+                    x, y,
+                    heading_deg,
+                    velocity,
+                    ang_vel,
+                    pwmL, pwmR,
+                    cntrl_out,
+                    dt)
         
-        state_log.write(f"0,{step},{sensors[0]},{sensors[1]},{sensors[2]},{x},{y},{heading_deg},{velocity},{ang_vel},{pwmL},{pwmR},{fitness}\n")
+        # state_log.write(f"0,{step},{sensors[0]},{sensors[1]},{sensors[2]},{x},{y},{heading_deg},{velocity},{ang_vel},{pwmL},{pwmR},{fitness}\n")
 
         gx = int(math.floor(x * inverted_gcs))
         gy = int(math.floor(y * inverted_gcs))
@@ -180,6 +186,9 @@ def run_simulation():
                     fitness -= core_kernels.TIMEOUT_PENALTY
                     print("Spinner detected! Terminating early.")
                     break
+        else:
+            print(f"Out of bounds: gx={gx}, gy={gy} (x={x}, y={y})")
+            break
 
         if core_kernels.circle_rect_collides(x, y, robot_r, rects):
             print("Crash!")
@@ -196,7 +205,7 @@ def run_simulation():
         show_debug_info(screen,
                         sensors,
                         np.array([x, y, heading_deg]),
-                        np.array([cmdL_raw, cmdR_raw]),
+                        cntrl_out,
                         np.array([pwmL, pwmR]),
                         fitness)
 
@@ -204,7 +213,6 @@ def run_simulation():
         clock.tick(1 / dt)
         step += 1
 
-    state_log.close()
     t1 = time.perf_counter()
     print(f"Simulation ended after {step} steps and {t1-t0:0.3f} s with fitness: {fitness:.2f}")
     pygame.quit()
