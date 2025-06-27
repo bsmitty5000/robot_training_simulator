@@ -22,9 +22,13 @@ def draw_course(screen, rects, color=(50, 50, 50)):
     """rects : (N,4) [l,r,t,b] world px."""
     for l, r, t, b in rects:
         w, h = r - l, b - t
-        pygame.draw.rect(screen, color, pygame.Rect(int(l), int(t), int(w), int(h)))
+        pygame.draw.rect(screen, color, \
+                         pygame.Rect(round(l*PIX_PER_M), round(t*PIX_PER_M), round(w*PIX_PER_M), round(h*PIX_PER_M)))
 
-def draw_robot(screen, x, y, r, hd_deg):
+def draw_robot(screen, x_m, y_m, r_m, hd_deg):
+    x = round(x_m * PIX_PER_M)
+    y = round(y_m * PIX_PER_M)
+    r = round(r_m * PIX_PER_M)
     pygame.draw.circle(screen, (0, 120, 255), world_to_screen(x, y), int(r), 2)
     # heading tick
     hd_rad = np.radians(hd_deg)
@@ -33,14 +37,21 @@ def draw_robot(screen, x, y, r, hd_deg):
     pygame.draw.line(screen, (0, 120, 255),
                      world_to_screen(x, y), world_to_screen(*end), 2)
 
-def draw_sensors(screen, x, y, hd_deg,
+def draw_sensors(screen, x_m, y_m, hd_deg,
                  sensor_vals,          # length-3 array (px)
-                 max_range,            # scalar px
-                 robot_r):
+                 max_range_m,            # scalar px
+                 robot_r_m):
     """Draw left, center, right IR beams."""
+    x = round(x_m * PIX_PER_M)
+    y = round(y_m * PIX_PER_M)
+    robot_r = robot_r_m * PIX_PER_M
+    max_range = max_range_m * PIX_PER_M
+
+    # todo get this from the sensor class
     offsets = np.array([-45.0, 0.0, 45.0], dtype=np.float32)
 
-    for idx, dist in enumerate(sensor_vals):
+    for idx, dist_m in enumerate(sensor_vals):
+        dist = round(dist_m * PIX_PER_M)
         head = np.radians(hd_deg + offsets[idx])
         # sensor origin = circle edge
         sx = x + math.cos(head) * robot_r
@@ -73,19 +84,20 @@ def run_simulation():
 
     # plug-ins
     ControllerClass,    ctrl_kwargs     = load_spec(cfg["controller"])
-    sensor_fn,     sens_kwargs      = load_spec(cfg["sensor"])
+    SensorClass,    sens_kwargs      = load_spec(cfg["sensor"])
     move_fn,       robot_kwargs     = load_spec(cfg["robot"])
     _,             opt_kwargs       = load_spec(cfg["optimizer"])
 
     # map + size
     rects, map_kwargs = load_map(cfg["map"])
-    world_w = map_kwargs.get("width_px", 1280.0)
-    world_h = map_kwargs.get("height_px", 720.0)
-    start_x = map_kwargs.get("starting_x", 75.0)
-    start_y = map_kwargs.get("starting_y", 75.0)
+    world_width     = map_kwargs.get("width_m")
+    world_height    = map_kwargs.get("height_m")
+    starting_x      = map_kwargs.get("starting_x_m")
+    starting_y      = map_kwargs.get("starting_y_m")
 
     # robot constants
-    robot_r = robot_kwargs["wheel_radius_m"] * PIX_PER_M
+    robot_r_m = robot_kwargs["wheel_radius_m"]
+    sensor  = SensorClass()
     controller  = ControllerClass(**ctrl_kwargs)
     controller_fn = controller.fwd if hasattr(controller, "fwd") else controller
 
@@ -104,29 +116,30 @@ def run_simulation():
         print(f"Loading latest chromosome from {latest_file}")
         chromosome = np.load(latest_file).astype(np.float32)
 
+    controller.print_chromosome(chromosome)
+
     # state vars
-    x, y            = start_x, start_y
+    x, y            = starting_x, starting_y
     heading_deg     = 0.0
     velocity        = 0.0
     ang_vel         = 0.0
     pwmL = pwmR     = 0.0
 
     fitness        = 0.0
-    grid_cell_size  = robot_r * 2.0
+    grid_cell_size  = robot_r_m * 2.0
     inverted_gcs    = 1.0 / grid_cell_size
-    W_GRID   = int(np.ceil(world_w  * inverted_gcs))
-    H_GRID   = int(np.ceil(world_h * inverted_gcs))
+    W_GRID   = int(np.ceil(world_width  * inverted_gcs))
+    H_GRID   = int(np.ceil(world_height * inverted_gcs))
     visited = np.zeros((W_GRID, H_GRID), dtype=np.uint8)
     visit_ct = 0
 
-    sensor_range = sens_kwargs["max_range_m"] * PIX_PER_M
-    sensor_reward_multiplier = core_kernels.CLEARANCE_REWARD / (sens_kwargs["num_sensors"] * sensor_range)
+    sensor_reward_multiplier =  \
+        core_kernels.CLEARANCE_REWARD / (sensor.NUM_SENSORS * sensor.SENSOR_RANGE_MAX_M)
 
     running = True
     step    = 0
-    sensor_max = sens_kwargs.get("max_range", 150.0)
     
-    screen = pygame.display.set_mode((world_w, world_h))
+    screen = pygame.display.set_mode((world_width * PIX_PER_M, world_height * PIX_PER_M))
     clock  = pygame.time.Clock()
 
     t0 = time.perf_counter()
@@ -139,22 +152,22 @@ def run_simulation():
                 running = False
 
         # ---------------- JIT pipeline -------------------------------
-        sensors = sensor_fn(x, y, heading_deg, rects, robot_r)
+        sensors = sensor.sense(x, y, heading_deg, rects, robot_r_m)
 
         clearance_reward = sensors.sum() * sensor_reward_multiplier
         fitness += clearance_reward
 
         
         open_space_bonus = np.sum(sensors >= \
-                                  (sensor_range * core_kernels.OPEN_SPACE_REWARD_CUTOFF))\
+                                  (sensor.SENSOR_RANGE_MAX_M * core_kernels.OPEN_SPACE_REWARD_CUTOFF))\
                                       * core_kernels.OPEN_SPACE_REWARD
         fitness += open_space_bonus
 
         cntrl_out = controller_fn(chromosome, controller.chrom_fmt(), sensors)
 
-        # if step > 0:
-        #     jitter_penalty = (abs(cmdL - pwmL) + abs(cmdR - pwmR)) * core_kernels.JITTER_PENALTY
-        #     fitness -= jitter_penalty
+        if step > 0:
+            jitter_penalty = abs(cntrl_out[0] - ang_vel) * core_kernels.JITTER_PENALTY
+            fitness -= jitter_penalty
 
         (x, y, heading_deg,
             velocity, ang_vel,
@@ -190,7 +203,7 @@ def run_simulation():
             print(f"Out of bounds: gx={gx}, gy={gy} (x={x}, y={y})")
             break
 
-        if core_kernels.circle_rect_collides(x, y, robot_r, rects):
+        if core_kernels.circle_rect_collides(x, y, robot_r_m, rects):
             print("Crash!")
             break
 
@@ -199,8 +212,8 @@ def run_simulation():
         # ---------------- drawing ------------------------------------
         screen.fill((30, 30, 30))
         draw_course(screen, rects)
-        draw_robot(screen, x, y, robot_r, heading_deg)
-        draw_sensors(screen, x, y, heading_deg, sensors, sensor_max, robot_r)
+        draw_robot(screen, x, y, robot_r_m, heading_deg)
+        draw_sensors(screen, x, y, heading_deg, sensors, sensor.SENSOR_RANGE_MAX_M, robot_r_m)
 
         show_debug_info(screen,
                         sensors,

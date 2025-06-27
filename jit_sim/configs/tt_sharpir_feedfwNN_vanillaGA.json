@@ -1,7 +1,7 @@
 {
   "steps_per_episode": 10000,
   "dt": 0.05,
-  "generations": 50,
+  "generations": 25,
   "save_best": true,
 
   "controller": {
@@ -19,9 +19,7 @@
 
   "sensor": {
     "module": "jit_sim.sensors.sharpir_3beam_standard_array",
-    "func":   "sense",
-    "num_sensors": 3,
-    "max_range_m": 0.3
+    "class":  "SharpIR3BeamStandardArray"
   },
   "optimizer": {
     "module": "jit_sim.optimisers.ga",
@@ -34,9 +32,9 @@
   },
   "map": {
     "module": "jit_sim.maps.simple_horizontal_rows",
-    "height_px": 720,
-    "width_px": 1280,
-    "starting_x": 75,
-    "starting_y": 80
+    "height_m": 1.5,
+    "width_m": 2.6,
+    "starting_x_m": 0.15,
+    "starting_y_m": 0.15
   }
 }

@@ -64,3 +64,37 @@ class FeedForwardNNController:
             out[o] = math.tanh(acc)
 
         return out
+    
+    def print_chromosome(self, chrom: np.array):
+        """
+        Pretty-print the weights and biases from a chromosome for a feed-forward NN,
+        with neuron inputs as rows and neuron outputs as columns.
+        """
+        idx = 0
+        print("Input-Hidden Weights (W_in):")
+        # W_in: shape (I, H)
+        for i in range(self.I):
+            row = []
+            for h in range(self.H):
+                row.append(f"{chrom[idx + h + i*self.H]: .4f}")
+            print(f"  Input {i}: [{', '.join(row)}]")
+        idx += self.I * self.H
+
+        print("\nHidden Biases (b_h):")
+        for h in range(self.H):
+            print(f"  Hidden {h}: {chrom[idx]: .4f}")
+            idx += 1
+
+        print("\nHidden-Output Weights (W_out):")
+        # W_out: shape (H, O)
+        for h in range(self.H):
+            row = []
+            for o in range(self.O):
+                row.append(f"{chrom[idx + o + h*self.O]: .4f}")
+            print(f"  Hidden {h}: [{', '.join(row)}]")
+        idx += self.H * self.O
+
+        print("\nOutput Biases (b_out):")
+        for o in range(self.O):
+            print(f"  Output {o}: {chrom[idx]: .4f}")
+            idx += 1

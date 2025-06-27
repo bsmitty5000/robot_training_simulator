@@ -3,7 +3,6 @@ from numba import njit
 import numpy as np
 
 PWM_TO_VELOCITY = 0.0017                  # m/s/pwm
-PWM_TO_VELOCITY_PX = PWM_TO_VELOCITY * 500.0     # px/s
 MAX_ROT_SPEED = 480.0               # deg/s
 MAX_PWM_CHANGE = 10
 DEG_TO_RAD = math.pi / 180.0
@@ -66,7 +65,7 @@ def move_step(
     ang_vel = ang_vel + (K - ang_vel) * alpha
 
     # hand-wavy experimental model for linear velocity
-    velocity = PWM_TO_VELOCITY_PX * avg_pwm
+    velocity = PWM_TO_VELOCITY * avg_pwm
 
     # 4) update pose
     angle_deg = (angle_deg + ang_vel * dt) % 360.0

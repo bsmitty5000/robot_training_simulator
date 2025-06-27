@@ -11,11 +11,11 @@ def show_debug_info(screen,
     font = pygame.font.SysFont("consolas", 12)
 
     # ---- fixed-width formatting ------------------------------------
-    sens_text = "Sensors: " + ", ".join(f"{s:6.1f}" for s in sensor_readings)
+    sens_text = "Sensors: " + ", ".join(f"{s:6.4f}" for s in sensor_readings)
     fit_text = f"Fitness: {fitness:10.2f}"
-    ctrl_text = "Ctrl: "    + ", ".join(f"{o:+7.3f}" for o in controller_outputs)
+    ctrl_text = "Ctrl: "    + ", ".join(f"{o:+7.4f}" for o in controller_outputs)
     pwm_text  = "PWM: "     + ", ".join(f"{i:+4.0f}"  for i in robot_inputs)   # -255..255
-    state_text= "Pos/Hdg: " + ", ".join(f"{v:7.1f}"   for v in robot_state)    # x y hd
+    state_text= "Pos/Hdg: " + ", ".join(f"{v:7.4f}"   for v in robot_state)    # x y hd
 
     line1 = f"{sens_text} | {fit_text}"
     line2 = f"{ctrl_text} | {pwm_text} | {state_text}"

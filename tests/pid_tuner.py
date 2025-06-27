@@ -36,6 +36,12 @@ for k in range(1, N):
     prev_e = e
 
     # -------- first-order plant -------------------
+    a=-0.943078214921608
+    b=1.1178174139163448
+    c=-25.21535005918709
+    tau=0.1284900161283904
+
+    K = a * pwmL + b * pwmR + c
     dx = (-x[k-1]/tau + Kplant*u[k])
     x[k] = x[k-1] + dx*dt
 

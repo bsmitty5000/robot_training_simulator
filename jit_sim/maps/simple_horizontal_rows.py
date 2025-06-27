@@ -1,17 +1,32 @@
 # [left, right, top, bottom]
-# WIDTH = 1280
-# HEIGHT = 720
-# DISTANCE_BETWEEN_OBSTACLES = 150
+WIDTH = 2.6
+HEIGHT = 1.5
+DISTANCE_BETWEEN_OBSTACLES = 0.3
+OBSTACTLE_WIDTH = 0.02
 
 obstacles = [
-    [0, 1280, 0, 10],       # top border
-    [0, 1280, 710, 720],    # bottom border    
-    [0, 10, 0, 720],        # left border
-    [1270, 1280, 0, 720],   # right border
+    [0, WIDTH, 0, OBSTACTLE_WIDTH],       # top border
+    [0, WIDTH, HEIGHT-OBSTACTLE_WIDTH, HEIGHT],    # bottom border    
+    [0, OBSTACTLE_WIDTH, 0, HEIGHT],        # left border
+    [WIDTH-OBSTACTLE_WIDTH, WIDTH, 0, HEIGHT],   # right border
 
-    [0, 1130, 150, 160],    # middle horizontal row
-    [150, 1280, 310, 320],  # middle horizontal row
+    [0, 
+     WIDTH-DISTANCE_BETWEEN_OBSTACLES, 
+     1 * DISTANCE_BETWEEN_OBSTACLES + OBSTACTLE_WIDTH, 
+     1 * DISTANCE_BETWEEN_OBSTACLES + 2 * OBSTACTLE_WIDTH],
 
-    [0, 1130, 470, 480],    # middle horizontal row
-    [150, 1280, 630, 640],  # middle horizontal row
+    [DISTANCE_BETWEEN_OBSTACLES, 
+     WIDTH, 
+     2 * DISTANCE_BETWEEN_OBSTACLES + OBSTACTLE_WIDTH, 
+     2 * DISTANCE_BETWEEN_OBSTACLES + 2 * OBSTACTLE_WIDTH],
+
+    [0, 
+     WIDTH-DISTANCE_BETWEEN_OBSTACLES, 
+     3 * DISTANCE_BETWEEN_OBSTACLES + OBSTACTLE_WIDTH, 
+     3 * DISTANCE_BETWEEN_OBSTACLES + 2 * OBSTACTLE_WIDTH],
+
+    [DISTANCE_BETWEEN_OBSTACLES, 
+     WIDTH, 
+     4 * DISTANCE_BETWEEN_OBSTACLES + OBSTACTLE_WIDTH, 
+     4 * DISTANCE_BETWEEN_OBSTACLES + 2 * OBSTACTLE_WIDTH],
 ]

@@ -31,16 +31,16 @@ generations         = cfg.get("generations", 5)
 
 # plug-ins
 ControllerClass,    ctrl_kwargs     = load_spec(cfg["controller"])
-sensor_fn,          sens_kwargs     = load_spec(cfg["sensor"])
+SensorClass,    sens_kwargs         = load_spec(cfg["sensor"])
 move_fn,            robot_kwargs    = load_spec(cfg["robot"])
 OptClass,           opt_kwargs      = load_spec(cfg["optimizer"])
 
 # map
 obstacles,      map_kwargs      = load_map(cfg["map"])     # shape (N,4)
-world_width     = map_kwargs.get("width_px", 1280.0)
-world_height    = map_kwargs.get("height_px", 720.0)
-starting_x      = map_kwargs.get("starting_x", 75.0)
-starting_y      = map_kwargs.get("starting_y", 75.0)
+world_width     = map_kwargs.get("width_m")
+world_height    = map_kwargs.get("height_m")
+starting_x      = map_kwargs.get("starting_x_m")
+starting_y      = map_kwargs.get("starting_y_m")
 
 # Bookkeeping
 global_best_fitness = 3000
@@ -63,6 +63,7 @@ for file in output_dir.glob("seed_chromosome*.npy"):
 # ────────────────────────────────────────────────────────────────────
 
 controller  = ControllerClass(**ctrl_kwargs)  # e.g. controller = FeedForwardNNController()
+sensor  = SensorClass()  # e.g. controller = FeedForwardNNController()
 optimizer   = OptClass(chrom_len= controller.chrom_len(), **opt_kwargs)           # e.g. GAOptimizer(population=256,…)
 population  = optimizer.initial_population()   # (pop, chrom_len) float32
 fitness_buf = np.empty(population.shape[0], dtype=np.float32)
@@ -83,13 +84,13 @@ for g in range(generations):
                                     obstacles,
                                     controller.fwd,
                                     controller.chrom_fmt(),
-                                    sensor_fn,
-                                    sens_kwargs["num_sensors"],
-                                    sens_kwargs["max_range_m"] * 500.0,  # px/m * 0.3m range
+                                    sensor.sense,
+                                    sensor.NUM_SENSORS,
+                                    sensor.SENSOR_RANGE_MAX_M,
                                     move_fn,
                                     steps_per_episode,
                                     dt,
-                                    robot_kwargs["wheel_radius_m"] * 500.0,  # px/m * 0.3m range
+                                    robot_kwargs["wheel_radius_m"],
                                     world_width,
                                     world_height,
                                     starting_x,

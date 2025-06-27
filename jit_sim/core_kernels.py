@@ -23,24 +23,24 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
                    move_fn,                        # callable(state, cmdL, cmdR, dt) -> new state
                    steps:       np.int32,
                    dt:          np.float32,
-                   robot_r:     np.float32,
-                   world_width: np.float32,
-                   world_height: np.float32,
-                   starting_x: np.float32,
-                   starting_y: np.float32) -> np.ndarray:
+                   robot_r_m:     np.float32,
+                   world_width_m: np.float32,
+                   world_height_m: np.float32,
+                   starting_x_m: np.float32,
+                   starting_y_m: np.float32) -> np.ndarray:
 
     pop_size        = population.shape[0]
     fitness         = np.zeros(pop_size, dtype=np.float32)
-    grid_cell_size  = robot_r * 2.0
+    grid_cell_size  = robot_r_m * 2.0
     inverted_gcs    = 1.0 / grid_cell_size
-    W_GRID   = int(np.ceil(world_width  * inverted_gcs))
-    H_GRID   = int(np.ceil(world_height * inverted_gcs))
+    W_GRID   = int(np.ceil(world_width_m  * inverted_gcs))
+    H_GRID   = int(np.ceil(world_height_m * inverted_gcs))
 
     sensor_reward_multiplier = CLEARANCE_REWARD / (num_sensors * sensor_range)
 
     # ── per-robot state vectors (all float32) ────────────────────────
-    x        = np.full(pop_size, starting_x,  np.float32)   # start X
-    y        = np.full(pop_size, starting_y,  np.float32)   # start Y
+    x        = np.full(pop_size, starting_x_m,  np.float32)   # start X
+    y        = np.full(pop_size, starting_y_m,  np.float32)   # start Y
     heading  = np.zeros(pop_size,        np.float32)   # deg CW
     velocity = np.zeros(pop_size,        np.float32)   # px/s
     ang_vel  = np.zeros(pop_size,        np.float32)   # deg/s
@@ -63,7 +63,7 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
         for step in range(steps):
 
             # 1) sense
-            sensors = sensor_fn(x[p], y[p], heading[p], rects, robot_r)
+            sensors = sensor_fn(x[p], y[p], heading[p], rects, robot_r_m)
 
             # clearance reward
             clearance_reward = sensors.sum() * sensor_reward_multiplier
@@ -82,9 +82,9 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
             cntrl_out = controller_fn(chrom, chrom_fmt, sensors)   # single output ∈ [-1, 1]
 
             # smoothness reward
-            # if step > 0:
-            #     jitter_penalty = (abs(cmdL - pwmL[p]) + abs(cmdR - pwmR[p])) * JITTER_PENALTY
-            #     fitness[p] -= jitter_penalty
+            if step > 0:
+                jitter_penalty = abs(cntrl_out[0] - ang_vel[p]) * JITTER_PENALTY
+                fitness[p] -= jitter_penalty
                 # if step < 10:
                 #     print("jitter penalty:", p, step, jitter_penalty, fitness[p])
 
@@ -131,7 +131,7 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
                 # print(p, step, x[p], y[p], heading[p], velocity[p])
 
             # 4) crash?
-            if circle_rect_collides(x[p], y[p], robot_r, rects):
+            if circle_rect_collides(x[p], y[p], robot_r_m, rects):
                 # print("\tcrash at\t\t", p, step, x[p], y[p])
                 # crashed = True
                 break                     # episode ends early
