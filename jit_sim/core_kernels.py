@@ -42,10 +42,8 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
     x        = np.full(pop_size, starting_x_m,  np.float32)   # start X
     y        = np.full(pop_size, starting_y_m,  np.float32)   # start Y
     heading  = np.zeros(pop_size,        np.float32)   # deg CW
-    velocity = np.zeros(pop_size,        np.float32)   # px/s
     ang_vel  = np.zeros(pop_size,        np.float32)   # deg/s
-    pwmL     = np.zeros(pop_size,        np.float32)
-    pwmR     = np.zeros(pop_size,        np.float32)
+    prev_ang_vel  = np.zeros(pop_size,        np.float32)   # deg/s
 
     visited = np.zeros((pop_size, W_GRID, H_GRID), dtype=np.uint8)  # bit-mask
     visit_ct = np.zeros(pop_size, dtype=np.int32)                   # counter
@@ -96,25 +94,20 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
             # NN gets previous-step IMU (gyro_z, accel_x) plus IRs
             cntrl_out = controller_fn(chrom, chrom_fmt, sensors_temporal)   # single output ∈ [-1, 1]
 
+            # 3) move
+            (x[p], y[p], heading[p], ang_vel[p]) = move_fn( x[p], y[p],
+                                                            heading[p],
+                                                            cntrl_out,
+                                                            dt)
+
             # smoothness reward
             if step > 0:
-                jitter_penalty = abs(cntrl_out[0] - ang_vel[p]) * JITTER_PENALTY
+                jitter_penalty = abs(prev_ang_vel[p] - ang_vel[p]) * JITTER_PENALTY
                 fitness[p] -= jitter_penalty
                 # if step < 10:
                 #     print("jitter penalty:", p, step, jitter_penalty, fitness[p])
-
-            # 3) move
-            (x[p], y[p], heading[p],
-                velocity[p], ang_vel[p],
-                pwmL[p], pwmR[p]) = move_fn(
-                        x[p], y[p],
-                        heading[p],
-                        velocity[p],
-                        ang_vel[p],
-                        pwmL[p], pwmR[p],
-                        cntrl_out,
-                        dt)
-
+            prev_ang_vel[p] = ang_vel[p]
+            
             # if(p == 0):
             #     state_log.write(f"{p},{step},{sensors[0]},{sensors[1]},{sensors[2]},{x[p]},{y[p]},{heading[p]},{velocity[p]},{ang_vel[p]},{pwmL[p]},{pwmR[p]},{fitness[p]}\n")
             

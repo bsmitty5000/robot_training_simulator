@@ -121,7 +121,7 @@ def run_simulation():
     # state vars
     x, y            = starting_x, starting_y
     heading_deg     = 0.0
-    velocity        = 0.0
+    prev_angle_vel  = 0.0
     ang_vel         = 0.0
     pwmL = pwmR     = 0.0
 
@@ -172,22 +172,18 @@ def run_simulation():
 
         cntrl_out = controller_fn(chromosome, controller.chrom_fmt(), sensors_temporal)
 
-        if step > 0:
-            jitter_penalty = abs(cntrl_out[0] - ang_vel) * core_kernels.JITTER_PENALTY
-            fitness -= jitter_penalty
 
-        (x, y, heading_deg,
-            velocity, ang_vel,
-            pwmL, pwmR) = move_fn(
-                    x, y,
-                    heading_deg,
-                    velocity,
-                    ang_vel,
-                    pwmL, pwmR,
-                    cntrl_out,
-                    dt)
+        (x, y, heading_deg, ang_vel) = move_fn( x, y,
+                                  heading_deg,
+                                    cntrl_out,
+                                    dt)
         
+        if step > 0:
+            jitter_penalty = abs(prev_angle_vel - ang_vel) * core_kernels.JITTER_PENALTY
+            fitness -= jitter_penalty
         # state_log.write(f"0,{step},{sensors[0]},{sensors[1]},{sensors[2]},{x},{y},{heading_deg},{velocity},{ang_vel},{pwmL},{pwmR},{fitness}\n")
+
+        prev_angle_vel = ang_vel
 
         gx = int(math.floor(x * inverted_gcs))
         gy = int(math.floor(y * inverted_gcs))
@@ -226,7 +222,6 @@ def run_simulation():
                         sensors,
                         np.array([x, y, heading_deg]),
                         cntrl_out,
-                        np.array([pwmL, pwmR]),
                         fitness)
 
         pygame.display.flip()

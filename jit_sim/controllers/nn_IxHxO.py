@@ -61,7 +61,9 @@ class FeedForwardNNController:
             for j in range(H):
                 acc += h[j] * chrom[idx]; idx += 1
             acc += chrom[N_in*H + H + H*O + o]
-            out[o] = math.tanh(acc)
+            #out[o] = math.tanh(acc)
+            
+            out[o] = 1.0 / (1.0 + math.exp(-acc))
 
         return out
     
