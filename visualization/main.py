@@ -143,6 +143,8 @@ def run_simulation():
     clock  = pygame.time.Clock()
 
     t0 = time.perf_counter()
+    sensor_history = np.full((4, 3), sensor.SENSOR_RANGE_MAX_M, dtype=np.float32)
+
     while running and step < steps_per_episode:
         # ---------------- Pygame events ------------------------------
         for event in pygame.event.get():
@@ -153,6 +155,11 @@ def run_simulation():
 
         # ---------------- JIT pipeline -------------------------------
         sensors = sensor.sense(x, y, heading_deg, rects, robot_r_m)
+        sensor_history[3] = sensor_history[2]
+        sensor_history[2] = sensor_history[1]
+        sensor_history[1] = sensor_history[0]
+        sensor_history[0] = sensors
+        sensors_temporal = sensor_history.flatten()
 
         clearance_reward = sensors.sum() * sensor_reward_multiplier
         fitness += clearance_reward
@@ -163,7 +170,7 @@ def run_simulation():
                                       * core_kernels.OPEN_SPACE_REWARD
         fitness += open_space_bonus
 
-        cntrl_out = controller_fn(chromosome, controller.chrom_fmt(), sensors)
+        cntrl_out = controller_fn(chromosome, controller.chrom_fmt(), sensors_temporal)
 
         if step > 0:
             jitter_penalty = abs(cntrl_out[0] - ang_vel) * core_kernels.JITTER_PENALTY

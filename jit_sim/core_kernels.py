@@ -52,6 +52,7 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
     stale_ctr = np.zeros(pop_size, dtype=np.int32)                  # stagnation
 
     #state_log = open("jit_robot_states.csv", "a")
+    sensor_history = np.zeros((pop_size, 4, 3), dtype=np.float32)
 
     # ────────────────── main GA batch loop (parallel) ────────────────
     for p in prange(pop_size):
@@ -63,15 +64,29 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
         for step in range(steps):
 
             # 1) sense
-            sensors = sensor_fn(x[p], y[p], heading[p], rects, robot_r_m)
+            #sensors = sensor_fn(x[p], y[p], heading[p], rects, robot_r_m)
+            # Shift previous readings back in time
+            sensor_history[p, 3] = sensor_history[p, 2]
+            sensor_history[p, 2] = sensor_history[p, 1]
+            sensor_history[p, 1] = sensor_history[p, 0]
+
+            # Get new reading into the newest slot
+            curr_sensors = sensor_fn(x[p], y[p], heading[p], rects, robot_r_m)
+            sensor_history[p, 0] = curr_sensors
+
+            # Build 12-element temporal sensor vector
+            sensors_temporal = np.empty(12, dtype=np.float32)
+            for t in range(4):
+                for s in range(3):
+                    sensors_temporal[t * 3 + s] = sensor_history[p, t, s]
 
             # clearance reward
-            clearance_reward = sensors.sum() * sensor_reward_multiplier
+            clearance_reward = curr_sensors.sum() * sensor_reward_multiplier
             fitness[p] += clearance_reward
             # if step < 10:
             #     print("clearance reward:", p, step, clearance_reward, fitness[p])
             
-            open_space_bonus = np.sum(sensors >= \
+            open_space_bonus = np.sum(curr_sensors >= \
                                       (sensor_range * OPEN_SPACE_REWARD_CUTOFF))\
                                           * OPEN_SPACE_REWARD
             fitness[p] += open_space_bonus
@@ -79,7 +94,7 @@ def run_generation(population:  np.ndarray,      # (P, N) array of P chromosomes
             #     print("clearance reward:", p, step, open_space_bonus, fitness[p])
 
             # NN gets previous-step IMU (gyro_z, accel_x) plus IRs
-            cntrl_out = controller_fn(chrom, chrom_fmt, sensors)   # single output ∈ [-1, 1]
+            cntrl_out = controller_fn(chrom, chrom_fmt, sensors_temporal)   # single output ∈ [-1, 1]
 
             # smoothness reward
             if step > 0:

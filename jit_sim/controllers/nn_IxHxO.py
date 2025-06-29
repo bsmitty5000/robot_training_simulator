@@ -70,31 +70,35 @@ class FeedForwardNNController:
         Pretty-print the weights and biases from a chromosome for a feed-forward NN,
         with neuron inputs as rows and neuron outputs as columns.
         """
-        idx = 0
-        print("Input-Hidden Weights (W_in):")
-        # W_in: shape (I, H)
+        weights = chrom[:-self.H - self.O]  # all but last H + O
+        biases  = chrom[-self.H - self.O:]  # last H + O
+        
+        # Input → Hidden
+        print("// Weights from input to hidden ({}x{})".format(self.I, self.H))
+        print("static const float w_input_hidden[{}][{}] = {{".format(self.I, self.H))
         for i in range(self.I):
-            row = []
-            for h in range(self.H):
-                row.append(f"{chrom[idx + h + i*self.H]: .4f}")
-            print(f"  Input {i}: [{', '.join(row)}]")
-        idx += self.I * self.H
+            row = weights[i*self.H:(i+1)*self.H]
+            print("    {" + ", ".join(f"{v:+0.4f}" for v in row) + "},")
+        print("};\n")
 
-        print("\nHidden Biases (b_h):")
+        # Hidden biases
+        print("// Biases for hidden layer ({})".format(self.H))
+        b_hidden = biases[:self.H]
+        print("static const float b_hidden[{}] = {{ {} }};\n".format(
+            self.H, ", ".join(f"{v:+0.4f}" for v in b_hidden)
+        ))
+
+        # Hidden → Output
+        print("// Weights from hidden to output ({}x{})".format(self.H, self.O))
+        print("static const float w_hidden_output[{}][{}] = {{".format(self.H, self.O))
         for h in range(self.H):
-            print(f"  Hidden {h}: {chrom[idx]: .4f}")
-            idx += 1
+            row = weights[self.I*self.H + h*self.O : self.I*self.H + (h+1)*self.O]
+            print("    {" + ", ".join(f"{v:+0.4f}" for v in row) + "},")
+        print("};\n")
 
-        print("\nHidden-Output Weights (W_out):")
-        # W_out: shape (H, O)
-        for h in range(self.H):
-            row = []
-            for o in range(self.O):
-                row.append(f"{chrom[idx + o + h*self.O]: .4f}")
-            print(f"  Hidden {h}: [{', '.join(row)}]")
-        idx += self.H * self.O
-
-        print("\nOutput Biases (b_out):")
-        for o in range(self.O):
-            print(f"  Output {o}: {chrom[idx]: .4f}")
-            idx += 1
+        # Output biases
+        print("// Biases for output layer ({})".format(self.O))
+        b_output = biases[self.H:]
+        print("static const float b_output[{}] = {{ {} }};".format(
+            self.O, ", ".join(f"{v:+0.4f}" for v in b_output)
+        ))

@@ -7,6 +7,9 @@ SENSOR_OFFSETS = np.array([-45.0, 0.0, 45.0], dtype=np.float32)
 SENSOR_RANGE_MIN_M = 0.06
 SENSOR_RANGE_MAX_M = 0.6
 
+NOISE_STD_FRACTION = 0.02  # 2% typical noise
+OUTLIER_PROB = 0.01  # 1% chance of outlier
+OUTLIER_HIGH = True  # True for max spikes, False for zero spikes
 
 class SharpIR3BeamStandardArray:
     NUM_SENSORS = 3
@@ -45,6 +48,21 @@ class SharpIR3BeamStandardArray:
                         SENSOR_RANGE_MAX_M)
 
             dist_m = dist_px
-            readings[s] = dist_m if dist_m >= SENSOR_RANGE_MIN_M else SENSOR_RANGE_MIN_M
+
+            # 4) add multiplicative Gaussian noise
+            noise = NOISE_STD_FRACTION * dist_m * np.random.randn()
+            noisy_reading = dist_m + noise
+
+            # Clamp to valid sensor range
+            noisy_reading = max(SENSOR_RANGE_MIN_M, min(SENSOR_RANGE_MAX_M, noisy_reading))
+
+             # ---- ADD OUTLIER SPIKES ----
+            if np.random.rand() < OUTLIER_PROB:
+                if OUTLIER_HIGH:
+                    noisy_reading = SENSOR_RANGE_MAX_M  # simulate missed detection
+                else:
+                    noisy_reading = SENSOR_RANGE_MIN_M  # simulate false obstacle
+
+            readings[s] = noisy_reading
 
         return readings
